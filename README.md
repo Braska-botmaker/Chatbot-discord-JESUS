@@ -1,6 +1,6 @@
 # ✝️ Discord bot – hudba, verše a upozornění na hry zdarma
 
-Elegantní Discord bot napsaný v Pythonu (discord.py), který umí:
+Discord bot napsaný v Pythonu (discord.py), který umí:
 
 * 🎵 Přehrávat hudbu z URL (YouTube přes `yt-dlp`) do voice kanálu
 * 📖 Posílat ranní a večerní zprávy s biblickým veršem
