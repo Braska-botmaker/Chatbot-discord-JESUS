@@ -5,7 +5,7 @@ Discord bot napsaný v Pythonu (discord.py), který umí:
 * 🎵 Přehrávat hudbu z URL (YouTube přes `yt-dlp`) do voice kanálu
 * 📖 Posílat ranní a večerní zprávy s biblickým veršem
 * 🙏 Žehnat hráčům při spuštění her a reagovat na společné hraní ve voice
-* 🎁 Každý večer publikovat „Hry zdarma“ z Epic Games
+* 🎁 Každý večer publikovat „Hry zdarma“ z Epic Games a Steamu
 * ℹ️ Hezké embed příkazy `!verze` a `!commands`
 
 > Optimalizováno pro běh na Raspberry Pi 24/7, ale funguje i lokálně na Windows/Linux/macOS.
