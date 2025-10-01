@@ -146,8 +146,10 @@ Hezký přehled najdete v `!commands`. Základ:
 ### Ostatní
 
 * `!verze` – info o verzi a změnách
-* `!verš` – náhodný biblický verš do chatu
-* `!hryzdarma` – aktuální přehled free her (Epic)
+* `!verš` – náhodný biblický verš do chatu – denní streak s pochvalou
+* `!hryzdarma` – aktuální přehled free her (Epic a Steam)
+* `!pozehnani @uživatel` – krátké osobní požehnání
+
 
 ---
 
@@ -259,6 +261,7 @@ journalctl -u discordbot -f
 
 ## 🗺️ Roadmapa
 
+* [x] Minihra pro discord uživatele
 * [ ] Vyhledávání písní podle názvu (bez URL)
 * [ ] Lepší multi‑server fronty (persist na disk)
 * [ ] Slash příkazy (`/play`, `/verš`…)
@@ -278,8 +281,4 @@ Zvolte licenci dle potřeby (např. MIT). Přidejte `LICENSE` soubor do repozit�
 * `discord.py` tým a komunita
 * Autoři `yt-dlp` a `ffmpeg`
 
----
 
-### Screenshoty / demo
-
-> (Volitelné) Vložte sem GIF/obrázky z chatu s příkazy `!verze`, `!commands`, `!play` atd.
