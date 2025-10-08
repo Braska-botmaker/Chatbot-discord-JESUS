@@ -267,7 +267,7 @@ journalctl -u discordbot -f
 * [ ] Lepší multi‑server fronty (persist na disk)
 * [ ] Slash příkazy (`/play`, `/verš`…)
 * [ ] Dockerfile a compose
-* [ ] Přidání Steam a PS hry do her zdarma
+* [x] Přidání Steam a PS hry do her zdarma
 
 ---
 
