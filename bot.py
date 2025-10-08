@@ -8,6 +8,8 @@ import os
 import requests
 from dotenv import load_dotenv
 import pytz
+from html import unescape as html_unescape
+import re
 
 import asyncio
 from collections import deque
@@ -426,19 +428,78 @@ async def send_night_message():
 
 # Získání her zdarma
 def get_free_games():
+    """Collect free games from multiple sources: Epic, Steam, PlayStation Blog (PlayStation Plus posts).
+
+    Returns a list of dicts with 'title' and 'url'. Deduplicates by (title, url).
+    """
     games = []
+    seen = set()
+
+    # Epic Games (existing behaviour)
     try:
         epic_api = "https://store-site-backend-static.ak.epicgames.com/freeGamesPromotions"
         response = requests.get(epic_api, timeout=5)
         data = response.json()
         for game in data["data"]["Catalog"]["searchStore"]["elements"]:
-            if game["price"]["totalPrice"]["discountPrice"] == 0:
-                games.append({
-                    "title": game["title"],
-                    "url": f"https://store.epicgames.com/p/{game['catalogNs']['mappings'][0]['pageSlug']}"
-                })
+            try:
+                if game["price"]["totalPrice"]["discountPrice"] == 0:
+                    title = game.get("title") or "Unknown"
+                    url = f"https://store.epicgames.com/p/{game['catalogNs']['mappings'][0]['pageSlug']}"
+                    key = (title, url)
+                    if key not in seen:
+                        seen.add(key)
+                        games.append({"title": title, "url": url})
+            except Exception:
+                continue
     except Exception as e:
         print(f"[ERROR] Epic Games API selhalo: {e}")
+
+    # Steam — scrape search results filtered for free games
+    try:
+        steam_url = "https://store.steampowered.com/search/?filter=free"
+        r = requests.get(steam_url, timeout=6, headers={"User-Agent": "Mozilla/5.0"})
+        html = r.text
+        # find rows: <a ... class="search_result_row" href="..."> ... <span class="title">Title</span>
+        pattern = re.compile(r'<a[^>]+class="search_result_row[^"]*"[^>]+href="(?P<href>[^"]+)"[^>]*>.*?<span class="title">(?P<title>.*?)</span>', re.S)
+        count = 0
+        for m in pattern.finditer(html):
+            title = re.sub(r"\s+", " ", m.group('title')).strip()
+            title = html_unescape(title)
+            href = m.group('href').split('?')[0]
+            key = (title, href)
+            if key not in seen:
+                seen.add(key)
+                games.append({"title": title, "url": href})
+                count += 1
+            if count >= 12:
+                break
+    except Exception as e:
+        print(f"[ERROR] Steam scrape selhalo: {e}")
+
+    # PlayStation Blog — PlayStation Plus tag feed (posts announcing monthly games)
+    try:
+        ps_feed = "https://blog.playstation.com/tag/playstation-plus/feed/"
+        r = requests.get(ps_feed, timeout=6, headers={"User-Agent": "Mozilla/5.0"})
+        if r.status_code == 200:
+            try:
+                import xml.etree.ElementTree as ET
+                root = ET.fromstring(r.content)
+                # iterate <item> elements
+                items = root.findall('.//item')
+                for item in items[:6]:
+                    title_el = item.find('title')
+                    link_el = item.find('link')
+                    title = title_el.text if title_el is not None else 'PlayStation Plus announcement'
+                    link = link_el.text if link_el is not None else 'https://blog.playstation.com'
+                    key = (title, link)
+                    if key not in seen:
+                        seen.add(key)
+                        games.append({"title": title, "url": link})
+            except Exception as e:
+                print(f"[ERROR] PlayStation feed parse selhalo: {e}")
+    except Exception as e:
+        print(f"[ERROR] PlayStation feed selhalo: {e}")
+
     return games
 
 # Hry zdarma
@@ -447,7 +508,7 @@ async def send_free_games():
     free_games = get_free_games()
     if not free_games:
         return
-    message = "**🎮 Dnešní hry zdarma:**\n" + "\n".join([f"- [{g['title']}]({g['url']})" for g in free_games])
+    message = "**🎮 Dnešní hry zdarma (Epic / Steam / PlayStation):**\n" + "\n".join([f"- [{g['title']}]({g['url']})" for g in free_games])
     for guild in bot.guilds:
         channel = get_channel_by_name(guild, "hry_zdarma💵")
         if channel and channel.permissions_for(guild.me).send_messages:
@@ -460,7 +521,7 @@ async def hry_zdarma(ctx):
     if not free_games:
         await ctx.send("Momentálně nejsou k dispozici žádné hry zdarma. 🙁")
         return
-    message = "**🎮 Aktuální hry zdarma:**\n" + "\n".join([f"- [{g['title']}]({g['url']})" for g in free_games])
+    message = "**🎮 Aktuální hry zdarma (Epic / Steam / PlayStation):**\n" + "\n".join([f"- [{g['title']}]({g['url']})" for g in free_games])
     await ctx.send(message)
 
 
@@ -770,17 +831,27 @@ async def verze_cmd(ctx):
         description="Informace o posledním updatu",
         color=discord.Color.blue()
     )
-    embed.add_field(name="Verze", value="**v1.3.0 🛠**", inline=False)
+    embed.add_field(name="Verze", value="**v1.4.0 🚀**", inline=False)
     embed.add_field(
         name="Novinky",
         value=(
+            "🆕 `!hryzdarma` – přehled aktuálních free her\n"
+            "🛒 Automaticky posíláme **hry zdarma ze Steamu** a **PlayStation Plus** (a stále i **Epic**)\n"
+            "🕗 Denní přehled v **21:10 CET** do kanálu `#hry_zdarma💵`"
+        ),
+        inline=False
+    )
+    embed.add_field(
+        name="Předešlé highlighty",
+        value=(
             "🔥 `!verš` – denní streak s pochvalou\n"
-            "🙏 `!pozehnani @uživatel` – krátké osobní požehnání\n"
+            "🙏 `!pozehnani @uživatel` – krátké osobní požehnání"
         ),
         inline=False
     )
     embed.set_footer(text="Váš věrný bot ✝️")
     await ctx.send(embed=embed)
+
 
 # --- COMMANDS ---
 @bot.command(name="commands")
