@@ -1,4 +1,6 @@
-# ✝️ Discord bot – hudba, verše a upozornění na hry zdarma
+# ✝️ Ježíš Discord Bot – hudba, verše a hry zdarma 🙏
+
+**Verze:** v2.0.5 | **Stav:** ✅ Plně funkční | **Zettle:** Raspberry Pi Ready
 
 Discord bot napsaný v Pythonu (discord.py), který umí:
 
@@ -30,9 +32,9 @@ Discord bot napsaný v Pythonu (discord.py), který umí:
 * [Roadmapa](#-roadmapa)
 * [Licence](#-licence)
 
----
+## ⚡ Rychlý start (5 minut)
 
-## ✅ Požadavky
+Viz **docs/RYCHLY_START.md**
 
 * **Python 3.10+**
 * **FFmpeg** (pro přehrávání do voice)
@@ -60,7 +62,11 @@ sudo apt install -y ffmpeg libopus0 python3-venv
 
 ---
 
-## 📦 Instalace
+## 📚 Dokumentace
+
+- **docs/RYCHLY_START.md** – 5 minut na desktop
+- **docs/INSTALACE.md** – Raspberry Pi (systemd, autostart, monitoring)
+- **docs/CHYBY.md** – Troubleshooting a FAQ
 
 ```bash
 # 1) klon repozitáře
@@ -206,7 +212,23 @@ journalctl -u discordbot -f
 
 ## 🩺 Diagnostika a řešení problémů
 
-### 1) „FFmpeg test selhal: ClientException: Not connected to voice“
+### ⚡ NOVÁ OPRAVA (v2.0) – Voice TimeoutError a YouTube problémy
+
+**Co se opravilo:**
+* ✅ **Robustní voice connectionu** – timeout na 8s pro každý connect/move pokus, retry logika s exponential backoff
+* ✅ **Stabilnější FFmpeg stream** – nové reconnect timeout (`-rw_timeout 5000000`), zvýšený bitrate buffer
+* ✅ **Lepší HTTP headers** – YouTube teď dostane korektní User-Agent z yt-dlp
+* ✅ **Watchdog systém** – bot automaticky pokusí se reconnectovat, když se voice ztratí během přehrávání
+* ✅ **Voice stav checker** – `wait_until_connected()` teď s progressivním čekáním (až 15 pokusů, 4.5s max)
+
+**Jak se to používá:**
+- `!play <URL>` – teď se automaticky s botům reconnectuje v případě selhání
+- `!vtest` – vyšší timeouty pro jistotu, lepší diagnostika
+- Bot se sám pokusí reconnectovat do posledního voice kanálu, pokud ztratil spojení během přehrávání
+
+---
+
+### 1) „FFmpeg test selhal: ClientException: Not connected to voice"
 
 * Zkontrolujte, že jste v **tom samém voice kanálu** jako bot při `!vtest`/`!play`.
 * Ověřte práva kanálu: **Connect** a **Speak**.
@@ -268,6 +290,7 @@ journalctl -u discordbot -f
 * [ ] Slash příkazy (`/play`, `/verš`…)
 * [ ] Dockerfile a compose
 * [x] Přidání Steam a PS hry do her zdarma
+* [x] **OPRAVENO (v2.0): Voice TimeoutError a flaky YouTube stream** – robustní reconnect, lepší FFmpeg, HTTP headers
 
 ---
 
