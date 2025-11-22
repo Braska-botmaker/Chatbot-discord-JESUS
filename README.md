@@ -1,15 +1,14 @@
 # ✝️ Ježíš Discord Bot – hudba, verše a hry zdarma 🙏
 
-**Verze:** v2.0.5e | **Stav:** ✅ Plně funkční | **Zettle:** Raspberry Pi Ready
+**Verze:** v2.1.0 – Slash Commands Era | **Stav:** ✅ Plně funkční | **Platform:** Raspberry Pi Ready
 
 Discord bot napsaný v Pythonu (discord.py), který umí:
 
 * 🎵 Přehrávat hudbu z URL (YouTube přes `yt-dlp`) do voice kanálu
 * 📖 Posílat ranní a večerní zprávy s biblickým veršem
 * 🙏 Žehnat hráčům při spuštění her a reagovat na společné hraní ve voice
-* 🎁 Každý večer publikovat „Hry zdarma“ z Epic Games a Steamu
-* 🎁 Každý večer publikovat „Hry zdarma“ z Epic Games, Steamu a PlayStation Plus (oznámení)
-* ℹ️ Hezké embed příkazy `!verze` a `!commands`
+* 🎁 Každý večer publikovat „Hry zdarma" z Epic Games
+* ℹ️ Slash commands: `/komandy`, `/verze`, `/diag` s automatickým autocomplete
 
 > Optimalizováno pro běh na Raspberry Pi 24/7, ale funguje i lokálně na Windows/Linux/macOS.
 
@@ -35,6 +34,20 @@ Discord bot napsaný v Pythonu (discord.py), který umí:
 ## ⚡ Rychlý start (5 minut)
 
 Viz **docs/RYCHLY_START.md**
+
+### Slash Commands – jak je používat?
+
+Po přihlášení bota vidíte `/` v Discord chatu. Veškeré příkazy jsou **slash commands**:
+
+```
+/yt https://youtube.com/watch?v=... – Přidej skladbu
+/další – Přeskoč
+/verse – Náhodný verš
+/bless @user – Požehnání pro uživatele
+/komandy – Kompletní seznam
+```
+
+**Žádné prefix commands!** V2.1.0 používá pouze `/` (app_commands) pro modernost a bezpečnost.
 
 * **Python 3.10+**
 * **FFmpeg** (pro přehrávání do voice)
@@ -67,6 +80,28 @@ sudo apt install -y ffmpeg libopus0 python3-venv
 - **docs/RYCHLY_START.md** – 5 minut na desktop
 - **docs/INSTALACE.md** – Raspberry Pi (systemd, autostart, monitoring)
 - **docs/CHYBY.md** – Troubleshooting a FAQ
+- **docs/ČTĚME_NEJDŘÍV.md** – Úvod pro nové uživatele
+- **privacy-policy.md** – Ochrana osobních údajů
+- **terms-of-service.md** – Podmínky služby
+
+### Automatická instalace
+
+**RPi/Linux:**
+```bash
+bash scripts/install.sh
+```
+
+**Linux/macOS (desktop):**
+```bash
+bash scripts/install-desktop.sh
+```
+
+**Windows:**
+```cmd
+scripts\install.bat
+```
+
+### Manuální instalace
 
 ```bash
 # 1) klon repozitáře
@@ -79,10 +114,10 @@ source .venv/bin/activate  # Windows: .venv\Scripts\activate
 
 # 3) nainstaluj závislosti
 pip install -U pip
-pip install discord.py python-dotenv yt-dlp PyNaCl
+pip install -r config/requirements.txt
 ```
 
-> **Tip:** Na Raspberry Pi držte vše v `/opt/discordbot/` a používejte stejné venv pro stabilitu.
+> **Tip:** Na Raspberry Pi běžte `bash scripts/install.sh` – vše se nastaví automaticky!
 
 ---
 
@@ -97,7 +132,7 @@ pip install discord.py python-dotenv yt-dlp PyNaCl
 
 ## ⚙️ Konfigurace (.env)
 
-V kořeni projektu vytvořte soubor `.env`:
+V kořeni projektu vytvořte soubor `.env` (vzor: `config/.env.example`):
 
 ```env
 DISCORD_TOKEN=PASTE_VAS_TOKEN_SEM
@@ -134,28 +169,29 @@ Voice práva v cílovém kanálu:
 
 ---
 
-## ⌨️ Příkazy
+## ⌨️ Příkazy (Slash Commands – v2.1.0)
 
-Hezký přehled najdete v `!commands`. Základ:
+Hezký přehled najdete v `/komandy`. Základ:
 
 ### Hudba
 
-* `!play <url>` – přidá skladbu do fronty a spustí přehrávání (YouTube přes yt‑dlp)
-* `!skip` – přeskočí aktuální skladbu
-* `!pause` / `!resume` – pauza/obnovení
-* `!stop` – zastaví a vyčistí frontu
-* `!leave` – odpojí bota z voice
-* `!mqueue` – vypíše frontu
-* `!np` – zobrazí právě přehrávanou skladbu
-* `!vtest` – rychlý 3s tón pro ověření FFmpeg/voice
-* `!diag` – výpis prostředí, práv a instalace
+* `/yt <url>` – přidá skladbu do fronty a spustí přehrávání (YouTube přes yt‑dlp)
+* `/další` – přeskoči aktuální skladbu
+* `/pauza` / `/pokračuj` – pauza/obnovení
+* `/zastav` – zastaví a vyčistí frontu
+* `/odejdi` – odpojí bota z voice
+* `/fronta` – vypíše frontu
+* `/np` – zobrazí právě přehrávanou skladbu
+* `/vtest` – rychlý 3s tón pro ověření FFmpeg/voice
+* `/diag` – výpis prostředí, práv a instalace
 
 ### Ostatní
 
-* `!verze` – info o verzi a změnách
-* `!verš` – náhodný biblický verš do chatu – denní streak s pochvalou
-* `!hryzdarma` – aktuální přehled free her (Epic a Steam)
-* `!pozehnani @uživatel` – krátké osobní požehnání
+* `/verze` – info o verzi a změnách
+* `/verse` – náhodný biblický verš do chatu – denní streak s pochvalou
+* `/freegames` – aktuální přehled free her (Epic Games)
+* `/bless @uživatel` – krátké osobní požehnání
+* `/komandy` – kompletní seznam příkazů
 
 
 ---
@@ -172,7 +208,9 @@ Hezký přehled najdete v `!commands`. Základ:
 
 ## 🧱 Běh na Raspberry Pi jako služba (systemd)
 
-**Příklad:** `/etc/systemd/system/discordbot.service`
+> **Automaticky:** Spusť `bash scripts/install.sh` – vygeneruje a nastaví systemd službu!
+
+**Manuální příklad:** `/etc/systemd/system/discordbot.service`
 
 ```ini
 [Unit]
@@ -212,19 +250,46 @@ journalctl -u discordbot -f
 
 ## 🩺 Diagnostika a řešení problémů
 
-### ⚡ NOVÁ OPRAVA (v2.0) – Voice TimeoutError a YouTube problémy
+### Slash Commands se nezobrazují?
 
-**Co se opravilo:**
-* ✅ **Robustní voice connectionu** – timeout na 8s pro každý connect/move pokus, retry logika s exponential backoff
-* ✅ **Stabilnější FFmpeg stream** – nové reconnect timeout (`-rw_timeout 5000000`), zvýšený bitrate buffer
-* ✅ **Lepší HTTP headers** – YouTube teď dostane korektní User-Agent z yt-dlp
-* ✅ **Watchdog systém** – bot automaticky pokusí se reconnectovat, když se voice ztratí během přehrávání
-* ✅ **Voice stav checker** – `wait_until_connected()` teď s progressivním čekáním (až 15 pokusů, 4.5s max)
+* Bot se nemusel správně **syncer** s Discordem. Zkus:
+  1. Restartuj bot: `systemctl restart discordbot` (RPi) nebo Ctrl+C a znovu spusť
+  2. Zkontroluj logy – měl by vidět: `[commands] Synced 15 slash commands`
+  3. Pokud pořád ne, zkontroluj oprávnění bota (Bot → Scopes: `bot`, Permissions: minimálně `Send Messages`, `Connect`, `Speak`)
 
-**Jak se to používá:**
-- `!play <URL>` – teď se automaticky s botům reconnectuje v případě selhání
-- `!vtest` – vyšší timeouty pro jistotu, lepší diagnostika
-- Bot se sám pokusí reconnectovat do posledního voice kanálu, pokud ztratil spojení během přehrávání
+### Slash Command selhal – "Interaction Failed"
+
+* Příčina: Bot nemá čas odpovědět do 3 sekund (timeout Discord API)
+* V2.1.0 to řeší: všechny commands mají `await interaction.response.defer()` nebo `send_message()`
+* Pokud pořád selhává: zkontroluj logy bota (`journalctl -u discordbot -f`)
+
+### 🔧 Diagnostické nástroje
+
+* **tools/rpi_voice_diagnostics.py** – Detailní diagnostika RPi voice stacku
+```bash
+python3 tools/rpi_voice_diagnostics.py
+```
+
+* **/diag command** – Přímo v Discord chatu
+```
+/diag
+```
+
+### ⚡ NOVÁ OPRAVA (v2.1.0) – Slash Commands + Robustní Error Handling
+
+**Co se změnilo oproti v2.0.5e:**
+* ✅ **Slash Commands (`/`) místo Prefix Commands (`!`)** – moderní, bezpečnější, autocomplete
+* ✅ **České názvy příkazů** – `/yt`, `/další`, `/pauza` namísto `/play`, `/skip`, `/pause`
+* ✅ **Robustní error handling** – všechny commands mají try-except wrappery (39 bloků)
+* ✅ **Deferred responses** – dlouhé operace (audio, network) se netimeout-ují
+* ✅ **RPi Voice patches** – Error 4006 retry logic s exponential backoff
+* ✅ **Lepší diagnostika** – `/diag` ukazuje systém, audio status, voice connections
+
+**Proč upgrade?**
+- Slash commands jsou stabilnější a budoucnější
+- Bezpečnější (žádné message prefix exploity)
+- Přehlednější pro uživatele (autocomplete pomůcka)
+- Lepší error handling = méně crashes
 
 ---
 
@@ -265,11 +330,37 @@ journalctl -u discordbot -f
 
 ---
 
-## 🎧 Poznámky k hudbě a streamování
+## 🎧 Poznámky k Slash Commands (v2.1.0)
 
-* Kód používá `FFmpegOpusAudio.from_probe` (pokud je k dispozici) s fallbackem na `FFmpegPCMAudio`.
-* Pro nestabilní konektivity je implementován **reconnect watchdog** a **backoff**.
-* Při `!play` se **ušetří poslední voice kanál** pro pozdější automatické připojení.
+### Jak používat?
+
+1. **Napište `/` do Discord zprávy** – Discord ti nabídne autocomplete
+2. **Vyber příkaz** – např. `/yt`, `/verse`, `/bless`
+3. **Vyplň parametry** – Discord ti pomůže s autosuggestem
+4. **Stiskni Enter** – příkaz se vykoná
+
+### Příklady
+
+```
+/yt https://youtube.com/watch?v=dQw4w9WgXcQ
+/dalí
+/verse
+/bless @username
+/komandy
+/diag
+```
+
+### Slash Commands vs Prefix Commands (Proč upgrade?)
+
+| Vlastnost | Slash Commands (`/`) | Prefix Commands (`!`) |
+|-----------|----------------------|----------------------|
+| Autocomplete | ✅ Ano | ❌ Ne |
+| Viditelnost | ✅ Hned vidět | ❌ Skryta |
+| Bezpečnost | ✅ Bezpečnější | ❌ Riziková |
+| Modernost | ✅ Budoucí Discord | ❌ Zastaralé |
+| Error Handling | ✅ 39 try/except | ⚠️ Méně |
+
+**Doporučujeme: Upgrade na v2.1.0!**
 
 ---
 
@@ -285,14 +376,23 @@ journalctl -u discordbot -f
 
 ## 🛣️ Roadmapa – Ježíš Discord Bot (v2.x → v3.x)
 
-### 🟩 v2.0.5e (AKTUÁLNÍ VERZE)
+### 🟩 v2.1.0 (AKTUÁLNÍ VERZE – Slash Commands Era)
 
-## 🚀 v2.1 – Slash Commands Era
-* kompletní přepis na `/play`, `/skip`, `/verse`, `/freegames`, `/bless`  
-* autocomplete search pro `/play`  
-* přehlednější `/diag`  
-* permission systém per-guild  
-* moderní foundation pro další verze  
+Nyní aktivní! Kompletní přepis na slash commands:
+* ✅ `/yt`, `/další`, `/pauza`, `/pokračuj`, `/zastav`, `/odejdi` – hudba s českými názvy
+* ✅ `/np`, `/fronta`, `/vtest` – queue management
+* ✅ `/verse`, `/freegames`, `/bless` – ostatní
+* ✅ `/komandy`, `/verze`, `/diag` – nápověda & diagnostika
+* ✅ Robustní error handling (39 try/except bloků)
+* ✅ RPi voice patches (Error 4006 – exponential backoff)
+* ✅ Deferred responses pro dlouhé operace
+* ✅ 24/7 scheduled tasks (ranní zprávy, noční zprávy, free games)
+
+## 🟩 v2.0.5e (MINULÁ VERZE – Legacy Prefix Commands)
+
+Zastaralá verze s prefix commands (`!play`, `!skip`, atd.). Zálohováno jako `bot_v2_0_5e_backup.py`.
+
+**Upgrade na v2.1.0 doporučujeme!**
 
 
 
