@@ -1,4 +1,4 @@
-# bot.py — v2.1.0 – Slash Commands Era (Ježíš Discord Bot)
+# bot.py — v2.1.0b – Slash Commands Era (Ježíš Discord Bot)
 # Kompletní přepis na slash commands s Czech názvy pro unikalitu
 # /yt, /další, /pauza, /zastav, /odejdi, /fronta, /verse, /freegames, /bless, /komandy, /diag
 
@@ -200,6 +200,20 @@ music_queues = {}
 now_playing = {}
 bot_loop = None
 
+# ===== VERSE STREAK TRACKING =====
+verse_streak = {}  # {user_id: {"count": int, "last_date": date}}
+streak_messages = {
+    0: "🎯 Začínáš svou cestu k Bohu! Veď ji s vírou.",
+    1: "✨ 1 den! Pokračuj v modlitbě.",
+    3: "🌟 3 dny! Bůh tě vidí a chválí.",
+    7: "⭐ Týden! Tvá věrnost je krásná.",
+    14: "💫 Dva týdny! Sláva tobě věrnému!",
+    30: "🏆 Měsíc věry! Bůh tě požehná.",
+    60: "👑 Dva měsíce! Jsi příkladem víry.",
+    90: "🎖️ Tři měsíce! Nebeské vojska tě chválí!",
+    365: "🌈 Rok! Tvá věrnost je vzorem pro všechny!",
+}
+
 YDL_OPTS = {
     "format": "bestaudio/best",
     "noplaylist": True,
@@ -216,6 +230,118 @@ YDL_OPTS = {
 FFMPEG_RECONNECT = "-reconnect 1 -reconnect_streamed 1 -reconnect_delay_max 5 -rw_timeout 5000000 -nostdin"
 FFMPEG_OPTIONS = "-vn -ac 1 -b:a 128k -bufsize 256k"
 FFMPEG_OPTIONS_RPi = "-vn -ac 1 -b:a 96k -bufsize 128k"
+
+# ===== DATA: Verses & Blessings =====
+
+verses = [
+    '"Bůh je láska, a kdo zůstává v lásce, zůstává v Bohu a Bůh v něm." (1 Jan 4,16)',
+    '"Pán je můj pastýř, nebudu mít nedostatek." (Žalm 23,1–2)',
+    '"Všechno mohu v Kristu, který mi dává sílu." (Filipským 4,13)',
+    '"Neboj se, neboť já jsem s tebou." (Izajáš 41,10)',
+    '"Žádejte, a bude vám dáno." (Matouš 7,7)',
+    '"Ať se vaše srdce nechvějí!" (Jan 14,1)',
+    '"Ve světě máte soužení, ale důvěřujte." (Jan 16,33)',
+    '"Milujte své nepřátele." (Lukáš 6,27)',
+    '"Radujte se v Pánu vždycky!" (Filipským 4,4)',
+    '"Láska je trpělivá, láska je dobrotivá." (1 Korintským 13,4)',
+    '"Požehnaný člověk, který doufá v Hospodina." (Jeremjáš 17,7)',
+    '"Věř v Pána celým svým srdcem." (Přísloví 3,5)',
+    '"Neboj se, jen věř." (Marek 5,36)',
+    '"Já jsem světlo světa." (Jan 8,12)',
+    '"Boží milosrdenství je věčné." (Žalm 136,1)',
+    '"Nebuďte úzkostliví o svůj život." (Matouš 6,25)',
+    '"Modlete se bez přestání." (1 Tesalonickým 5,17)',
+    '"On uzdravuje ty, kdo mají zlomené srdce." (Žalm 147,3)',
+    '"Já jsem s vámi po všechny dny." (Matouš 28,20)',
+    '"Pane, nauč nás modlit se." (Lukáš 11,1)',
+    '"Hledejte nejprve Boží království." (Matouš 6,33)',
+    '"Tvá víra tě uzdravila." (Marek 5,34)',
+    '"Buď silný a odvážný." (Jozue 1,9)',
+    '"Žádná zbraň, která se proti tobě připraví, neuspěje." (Izajáš 54,17)',
+    '"Jsem cesta, pravda i život." (Jan 14,6)',
+    '"Pán je blízko všem, kdo ho vzývají." (Žalm 145,18)',
+    '"Odpouštějte, a bude vám odpuštěno." (Lukáš 6,37)',
+    '"Každý dobrý dar je shůry." (Jakub 1,17)',
+    '"S radostí budete čerpat vodu ze studnic spásy." (Izajáš 12,3)',
+    '"Neboť u Boha není nic nemožného." (Lukáš 1,37)',
+    '"Hospodin je moje světlo a moje spása." (Žalm 27,1)',
+    '"Milost vám a pokoj od Boha Otce našeho." (Filipským 1,2)',
+    '"Ježíš Kristus je tentýž včera, dnes i navěky." (Židům 13,8)',
+    '"Bůh sám bude s nimi." (Zjevení 21,3)',
+    '"Kdo v něj věří, nebude zahanben." (Římanům 10,11)',
+    '"Ať se radují všichni, kdo se k tobě utíkají." (Žalm 5,12)',
+    '"Jeho milosrdenství je nové každé ráno." (Pláč 3,23)',
+    '"Dej nám dnes náš denní chléb." (Matouš 6,11)',
+    '"Neskládejte poklady na zemi." (Matouš 6,19)',
+    '"Zůstaňte v mé lásce." (Jan 15,9)',
+    '"Síla a krása jsou v jeho chrámu." (Žalm 29,4)',
+    '"Blahoslavený ten, kdo slyší slovo Boží a střeží ho." (Lukáš 11,28)',
+    '"Proměňujte se obnovou své mysli." (Římanům 12,2)',
+    '"Neboť věčná slava je mnohem větší..." (2 Korintským 4,17)',
+    '"Vaše tělo je chrámem Ducha svatého." (1 Korintským 6,19)',
+    '"Být slabý – to je být silný v Kristu." (2 Korintským 12,10)',
+    '"Věci, které vidíš, nejsou věčné; věci neviditelné jsou věčné." (2 Korintským 4,18)',
+    '"Nic vás nemůže oddálit od Boží lásky." (Římanům 8,39)',
+    '"Snad jsem vám psát smutný dopis..." (1 Tesalonickými 5,16–18)',
+    '"Ten, kdo je v Kristu, je nové stvoření." (2 Korintským 5,17)',
+    '"Běžte sebou v určené běh s vytrvalostí." (Židům 12,1)',
+    '"Nezapomínejte na pohostinnost!" (Židům 13,2)',
+    '"Bůh není Bůh těch mrtvých, ale živých." (Marek 12,27)'
+]
+
+game_blessings = {
+    "League of Legends": "Ať tě neodvede do pokušení toxicit, ale zbaví tě feederů.",
+    "Counter-Strike 2": "Ať jsou tvé reflexy rychlé a spoluhráči nejsou AFK.",
+    "Satisfactory": "Ať jsou tvé továrny efektivní a pásy nikdy nezaseknou.",
+    "Minecraft": "Ať draka prdel nakopeš!",
+    "Mafia": "Pamatuj – rodina je všechno. Ať tě ochrání před každým podrazem.",
+    "Mafia II": "Buď jako Vito – čestný mezi nečestnými. Ať tě nezasáhne zrada.",
+    "Resident Evil 2": "Ať ti nikdy nedojdou náboje v Raccoon City.",
+    "Resident Evil 3": "Ať tě Nemesis mine obloukem.",
+    "Resident Evil 4": "Ať tě El Gigante nezašlápne.",
+    "Resident Evil 7": "Ať přežiješ noc v domě Bakers.",
+    "Resident Evil 8": "Ať tě paní Dimitrescu nenajde pod sukní.",
+    "KLETKA": "Dej bacha, ať ti nedojde benzín, bratře.",
+    "КЛЕТЬ Демо": "Dej bacha na souseda.",
+    "Ready or Not": "Ať tě Pán vede v každé akci a dá ti klidnou hlavu v boji za spravedlnost.",
+    "Roblox": "Ať tvá kreativita roste a radost z hraní tě nikdy neopustí.",
+    "Counter-Strike: Global Offensive": "Ať je tvůj AIM přesný a týmoví kamarádi pevní.",
+    "Dota 2": "Ať tvůj draft vede k vítězství a toxicita tě míjí.",
+    "Cyberpunk 2077": "Ať tě budoucnost obohatí a ne zaženou noční můry.",
+    "Elden Ring": "Ať ten boss padne co nejrychleji bratře",
+    "Team Fortress 2": "Ať ti nostalgie nezahltí mozek",
+    "Rust": "Ať tě nikdo nezradí, jako mě kdysi",
+    "ARK: Survival Evolved": "Ať tvůj kmen přežije ve světě dinosaurů.",
+    "Grand Theft Auto V": "Ať tě nezavřou",
+    "Fall Guys": "Ať skončíš na trůnu a ne na posledním místě.",
+    "Terraria": "Ať tvé podzemí oplývá poklady a dobrodružstvím.",
+    "Phasmophobia": "Ať duchové zůstanou jen legendou a vy se vrátíte v klidu domů.",
+    "Valheim": "Ať tě Odin provede světy plnými výzev.",
+    "Among Us": "Ať vás bude hodně a zrada vyloučena.",
+    "Rocket League": "Ať tvůj tým střílí góly jako z evangelia radosti.",
+    "Black Desert Online": "Ať tvé cestování bohatě obohatí duchovní i materiální život.",
+    "The Witcher 3": "Ať tvá cesta po Ciri vedena moudrostí a milosrdenstvím.",
+    "Red Dead Redemption 2": "Ať tvá čest je silnější než touha po penězích",
+    "Hades": "Ať tvoje cesta z podsvětí vede k osvobození a odpuštění.",
+    "Tom Clancy's Rainbow Six Siege X": "Ať tvá taktika zachrání životy, ne přidá zármutek.",
+    "Skyrim": "Ať dračí křídla nevzbudí zlo, a tvé srdce zůstane silné.",
+    "The Binding of Isaac: Rebirth": "Ať ti rng bůh přeje a přinese ti všechny tier 4 předměty, které si přeješ.",
+    "Dead by Daylight": "Ať tě temnota nepohltí bratře v kristu.🙏",
+    "Project Zomboid": "Ať to ve zombie apokalypse zvládneš co nejdýl a najdeš aspoň trochu bezpečný barák, kde ti to nerozbijou nemrtví.",
+    "Half-Life": "Ať tě Freeman provede Borderworldem bez toho, aby tě cokoliv sežralo nebo rozdrtilo.",
+    "Half-Life 2": "Buď jako Gordon – tichej, ale všechno kolem tebe padá k zemi. Prostě efektivní jak prase.",
+    "Half-Life: Alyx": "Ať tě Combine nechytí a celá Alyxina mise dopadne tak epicky, jak si zaslouží.",
+    "VALORANT": "Ať tvůj aim lítá jak laser a týmová ekonomika se ti nerozsype po dvou kolech.",
+    "Arena Breakout: Infinite": "Ať v té betonce najdeš tu nejlepší lootárnu a exit zvládneš bez toho, aby tě někdo sundal.",
+    "Fallout": "Válka se fakt nemění… ale ty klidně můžeš a pěkně jim to tam nalož.",
+    "Fallout 2": "Ať tvoje cesta mezi Vault Dwellery skončí spíš oslavou než atomovým ohňostrojem.",
+    "Fallout 3": "Ať Project Purity fakt zachrání svět a neskončí to jen dalším radioaktivním fiaskem.",
+    "Fallout: New Vegas": "Ať už půjdeš s Yes Manem, NCR nebo Caesarovými blázny, ať ti to padne do noty a Vegas je tvoje.",
+    "Fallout 4": "Ať najdeš svého potomka a Commonwealth dáš dohromady dřív, než ho někdo vyhodí do vzduchu.",
+    "Fallout 76": "Ať v pustině narazíš na živý lidi a ne jen na mrtvý servery a prázdný lokace.",
+    "Kingdom Come: Deliverance": "Ať tvoje jízdy na Šedivce kolem Ratají skončí vždycky na sedle, ne na zemi.",
+    "Kingdom Come: Deliverance II": "Ať se Jindra dočká své odvety a království zůstane v bezpečí.",
+}
 
 def get_ffmpeg_options():
     """Return FFmpeg options optimized for platform (RPi uses lower bitrate)."""
@@ -590,16 +716,49 @@ async def vtest_command(interaction: discord.Interaction):
 
 @bot.tree.command(name="verse", description="Random biblický verš")
 async def verse_command(interaction: discord.Interaction):
-    """Send random Bible verse."""
+    """Send random Bible verse with daily streak tracking."""
     try:
-        verses = [
-            ("Jan 3:16", "Neboť Bůh tak miloval svět, že dal svého jednorozeného Syna, aby žádný, kdo věří v něho, nezahynul, ale měl věčný život."),
-            ("Římanům 6:9", "Víme, že Kristus, když vstoupil z mrtvých, již nezemírá; smrt už nad ním nemá moc."),
-            ("1. Korintským 15:55-57", "\"Smrtí, kde je tvoje vítězství? Smrtí, kde je tvůj žahadlo?\" Vítězství dává nám Bůh skrze Pána našeho Ježíše Krista."),
-        ]
+        user_id = interaction.user.id
+        today = datetime.date.today()
+        
+        # Initialize streak if needed
+        if user_id not in verse_streak:
+            verse_streak[user_id] = {"count": 0, "last_date": None}
+        
+        user_streak = verse_streak[user_id]
+        
+        # Check if user already got verse today
+        if user_streak["last_date"] == today:
+            streak_count = user_streak["count"]
+            selected = random.choice(verses)
+            message = f"📖 Už si dnes vzal verš! Tvoje série: **{streak_count}** dní"
+            embed = discord.Embed(title="Biblický Verš", description=selected, color=discord.Color.gold())
+            embed.add_field(name="🔥 Série", value=message, inline=False)
+            await interaction.response.send_message(embed=embed)
+            return
+        
+        # Check if streak continues (yesterday)
+        yesterday = today - datetime.timedelta(days=1)
+        if user_streak["last_date"] == yesterday:
+            # Streak continues!
+            user_streak["count"] += 1
+        else:
+            # Streak broken or first time
+            user_streak["count"] = 1
+        
+        user_streak["last_date"] = today
+        streak_count = user_streak["count"]
+        
+        # Get milestone message
+        milestone_msg = ""
+        for days in sorted(streak_messages.keys(), reverse=True):
+            if streak_count >= days:
+                milestone_msg = f"\n\n🎉 {streak_messages[days]}"
+                break
         
         selected = random.choice(verses)
-        embed = discord.Embed(title=f"📖 {selected[0]}", description=selected[1], color=discord.Color.gold())
+        embed = discord.Embed(title="📖 Biblický Verš", description=selected, color=discord.Color.gold())
+        embed.add_field(name="🔥 Tvoje série", value=f"**{streak_count}** dní\n{milestone_msg}", inline=False)
         await interaction.response.send_message(embed=embed)
     except Exception as e:
         try:
@@ -635,7 +794,7 @@ async def verze_command(interaction: discord.Interaction):
     """Show bot version and changelog."""
     try:
         embed = discord.Embed(title="ℹ️ Ježíš Discord Bot", color=discord.Color.gold())
-        embed.add_field(name="Verze", value="v2.1.0 – Slash Commands Era", inline=False)
+        embed.add_field(name="Verze", value="v2.1.0b – Slash Commands Era", inline=False)
         embed.add_field(name="Co je nového", value="""
 ✅ Kompletní přepis na slash commands
 ✅ Czech názvy pro unikalitu
@@ -656,13 +815,19 @@ async def bless_command(interaction: discord.Interaction, user: discord.User = N
     """Send blessing to user."""
     try:
         target = user or interaction.user
-        blessings = [
+        # Try to use game_blessings if available, fallback to generic blessings
+        all_blessings = list(game_blessings.values()) + [
             f"🙏 {target.mention}, Bůh tě požehná v každém kroku!",
             f"✝️ {target.mention}, sila a láska Boží jsou s tebou!",
             f"💫 {target.mention}, přeji ti pokoj a radost v Kristu!",
         ]
         
-        embed = discord.Embed(description=random.choice(blessings), color=discord.Color.gold())
+        selected = random.choice(all_blessings)
+        # Add mention if it's a game blessing (doesn't have mention already)
+        if target.mention not in selected:
+            selected = f"{target.mention}, {selected}"
+        
+        embed = discord.Embed(description=selected, color=discord.Color.gold())
         await interaction.response.send_message(embed=embed)
     except Exception as e:
         try:
