@@ -1,6 +1,6 @@
 # ✝️ Ježíš Discord Bot – hudba, verše a hry zdarma 🙏
 
-**Verze:** v2.0.5 | **Stav:** ✅ Plně funkční | **Zettle:** Raspberry Pi Ready
+**Verze:** v2.0.5e | **Stav:** ✅ Plně funkční | **Zettle:** Raspberry Pi Ready
 
 Discord bot napsaný v Pythonu (discord.py), který umí:
 
@@ -282,15 +282,91 @@ journalctl -u discordbot -f
 
 ---
 
-## 🗺️ Roadmapa
 
-* [x] Minihra pro discord uživatele
-* [ ] Vyhledávání písní podle názvu (bez URL)
-* [ ] Lepší multi‑server fronty (persist na disk)
-* [ ] Slash příkazy (`/play`, `/verš`…)
-* [ ] Dockerfile a compose
-* [x] Přidání Steam a PS hry do her zdarma
-* [x] **OPRAVENO (v2.0): Voice TimeoutError a flaky YouTube stream** – robustní reconnect, lepší FFmpeg, HTTP headers
+## 🛣️ Roadmapa – Ježíš Discord Bot (v2.x → v3.x)
+
+### 🟩 v2.0.5e (AKTUÁLNÍ VERZE)
+
+## 🚀 v2.1 – Slash Commands Era
+* kompletní přepis na `/play`, `/skip`, `/verse`, `/freegames`, `/bless`  
+* autocomplete search pro `/play`  
+* přehlednější `/diag`  
+* permission systém per-guild  
+* moderní foundation pro další verze  
+
+
+
+## ✨ v2.2 – Minihry & Interakce
+* `/biblickykviz` – biblický trivia systém  
+* `/versfight @user` – veršový duel  
+* `/rollblessing` – RNG požehnání (cooldown)  
+* XP/role systém „učedník → prorok → apoštol“  
+* lehké textové minihry, RPi-friendly  
+
+
+
+## 🎮 v2.3 – Game Presence Engine 2.0
+* pokročilé sledování hraných her uživatelů  
+* personalizovaná požehnání podle hrané hry  
+* týdenní shrnutí hraní hráčů  
+* statistiky: nejhranější hry, nejaktivnější hráči, společné hraní  
+* auto-role typu „Gamer“, „Night Warrior“, „Weekend Crusader“  
+
+
+
+## 🔥 v2.4 – Music QoL Pack
+* rychlejší reconnect při ping spikech  
+* ukládání posledního voice kanálu → auto-reconnect po restartu  
+* lepší práce s frontou (blokace duplicity, auto-clean)  
+* přepracovaný `/mqueue` s embedem  
+* stabilnější `/stop` a reconnect logika  
+
+
+
+## 🛠️ v2.5 – Channel Config Pack
+* `/setchannel <typ> <kanál>` – rychlé nastavení kanálů pro verše i „hry zdarma“  
+* `/config` – přehled aktuální konfigurace serveru  
+* bezpečné ukládání nastavení pro každý server zvlášť  
+* validace perms (pokud bot nemůže psát → inteligentní hláška)  
+* čisté logování změn (RPi-safe)
+
+
+
+## 🎁 v2.6 – Free Games Engine 3.0
+* přidány platformy: GOG, Ubisoft, Amazon Gaming  
+* embed galerie her  
+* upozornění na končící hry  
+* `/freegames history`  
+* robustnější scraping + bezpečné fallbacky  
+
+
+
+## 📈 v2.7 – Server Analytics & Summary
+* `/serverstats` – přehled aktivit, hudby, miniher  
+* leaderboard hráčů  
+* `/myactivity` – osobní statistiky  
+* týdenní shrnutí aktivit (bez AI – čistá data)  
+* agregace hraných her + hudební historie  
+
+
+
+## 🌐 v2.8 – Web Dashboard (Pi-hosted)
+* běžící přímo na Raspberry Pi (Flask nebo FastAPI)  
+* živé zobrazení právě hrané hudby  
+* vizuální konfigurace kanálů, nastavení, cron úloh  
+* log viewer + jednodušší diagnostika  
+* mobile-friendly UI  
+
+
+
+## 💎 v3.0 – Ježíš Discord Bot PRO
+* multi-language režim (CZ / EN / SK)  
+* modulární plugin systém  
+* oddělené konfigurace per-guild  
+* základní companion web app (PWA)  
+* příprava na více instancí (cluster-ready architektura)  
+
+
 
 ---
 
