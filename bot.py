@@ -794,13 +794,14 @@ async def verze_command(interaction: discord.Interaction):
     """Show bot version and changelog."""
     try:
         embed = discord.Embed(title="ℹ️ Ježíš Discord Bot", color=discord.Color.gold())
-        embed.add_field(name="Verze", value="v2.1.0b – Slash Commands Era", inline=False)
+        embed.add_field(name="Verze", value="v2.1.C – Slash Commands Era", inline=False)
         embed.add_field(name="Co je nového", value="""
 ✅ Kompletní přepis na slash commands
 ✅ Czech názvy pro unikalitu
 ✅ `/yt` místo `/play`
 ✅ `/další`, `/pauza`, `/pokračuj`, `/zastav`, `/odejdi`, `/fronta`
 ✅ `/verse`, `/freegames`, `/bless`, `/komandy`, `/diag`
+❌ konec pingovaní u automatických zpráv                   
 """, inline=False)
         embed.add_field(name="GitHub", value="https://github.com/Braska-botmaker/Chatbot-discord-JESUS", inline=False)
         await interaction.response.send_message(embed=embed)
@@ -901,13 +902,15 @@ async def diag_command(interaction: discord.Interaction):
 
 @tasks.loop(hours=24)
 async def send_morning_message():
-    """Send morning message at 07:00 CET."""
+    """Send morning message at 09:00 CET."""
     now = datetime.datetime.now(pytz.timezone("Europe/Prague"))
-    if now.hour == 7 and now.minute < 1:
+    if now.hour == 9 and now.minute < 1:
         for guild in bot.guilds:
             channel = discord.utils.get(guild.text_channels, name="požehnání🙏")
             if channel:
+                verse = random.choice(verses)
                 embed = discord.Embed(title="🌅 Dobré ráno!", description="Nechť tě Bůh požehná v novém dni!", color=discord.Color.orange())
+                embed.add_field(name="📖 Dnešní verš", value=verse, inline=False)
                 try:
                     await channel.send(embed=embed)
                 except:
@@ -915,9 +918,9 @@ async def send_morning_message():
 
 @tasks.loop(hours=24)
 async def send_night_message():
-    """Send night message at 20:00 CET."""
+    """Send night message at 22:00 CET."""
     now = datetime.datetime.now(pytz.timezone("Europe/Prague"))
-    if now.hour == 20 and now.minute < 1:
+    if now.hour == 22 and now.minute < 1:
         for guild in bot.guilds:
             channel = discord.utils.get(guild.text_channels, name="požehnání🙏")
             if channel:
@@ -979,6 +982,55 @@ async def before_free_games():
 @voice_watchdog.before_loop
 async def before_watchdog():
     await bot.wait_until_ready()
+
+# ===== GAME PRESENCE TRACKING =====
+
+@bot.event
+async def on_presence_update(before, after):
+    """Track when user starts/stops playing a game and send blessing."""
+    def is_game_activity(activity):
+        return activity.type == discord.ActivityType.playing
+
+    # Skip if no guild or user is bot
+    if not after.guild or after.bot:
+        return
+
+    before_game = next((a for a in before.activities if is_game_activity(a)), None)
+    after_game = next((a for a in after.activities if is_game_activity(a)), None)
+
+    # Game started (was not playing, now is playing)
+    if before_game is None and after_game is not None:
+        game_name = after_game.name
+        print(f"[presence] {after.name} started playing: {game_name}")
+        
+        # Get blessing message
+        if game_name in game_blessings:
+            blessing = game_blessings[game_name]
+        else:
+            # Fallback to generic blessing
+            blessing = random.choice([
+                "Bůh tě provede hraním a dej to všechno!",
+                "Zábava s vírou – ať ti to jde!",
+                "Vychutnej si hru a bůh tě chrání!",
+            ])
+        
+        # Find channel and send blessing
+        channel = discord.utils.get(after.guild.text_channels, name="požehnání🙏")
+        if channel and channel.permissions_for(after.guild.me).send_messages:
+            msg = f"{after.name} právě hraje **{game_name}**. {blessing}"
+            embed = discord.Embed(description=msg, color=discord.Color.gold())
+            print(f"[presence] Sending to {channel.name}: {msg}")
+            try:
+                await channel.send(embed=embed)
+                print(f"[presence] Message sent!")
+            except Exception as send_err:
+                print(f"[presence] Failed to send: {send_err}")
+        else:
+            print(f"[presence] Channel 'požehnání🙏' not found or no permissions")
+    
+    # Game stopped
+    elif before_game is not None and after_game is None:
+        print(f"[presence] {after.name} stopped playing: {before_game.name}")
 
 # ===== MAIN =====
 
