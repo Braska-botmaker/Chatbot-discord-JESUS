@@ -1,6 +1,6 @@
 # ✝️ Ježíš Discord Bot – hudba, verše a hry zdarma 🙏
 
-**Verze:** v2.1.3 – Slash Commands Era | **Platform:** Raspberry Pi Ready
+**Verze:** v2.1.4 – Slash Commands Era | **Platform:** Raspberry Pi Ready
 
 Discord bot napsaný v Pythonu (discord.py), který umí:
 
@@ -47,7 +47,7 @@ Po přihlášení bota vidíte `/` v Discord chatu. Veškeré příkazy jsou **s
 /komandy – Kompletní seznam
 ```
 
-**Žádné prefix commands!** V2.1.3 používá pouze `/` (app_commands) pro modernost a bezpečnost.
+**Žádné prefix commands!** V2.1.4 používá pouze `/` (app_commands) pro modernost a bezpečnost.
 
 * **Python 3.10+**
 * **FFmpeg** (pro přehrávání do voice)
@@ -169,7 +169,7 @@ Voice práva v cílovém kanálu:
 
 ---
 
-## ⌨️ Příkazy (Slash Commands – v2.1.3)
+## ⌨️ Příkazy (Slash Commands – v2.1.4)
 
 Hezký přehled najdete v `/komandy`. Základ:
 
@@ -275,18 +275,18 @@ python3 tools/rpi_voice_diagnostics.py
 /diag
 ```
 
-### ⚡ NOVÁ OPRAVA (v2.1.3) – Auto-Connect to Voice + Bug Fixes
+### ⚡ NOVÁ OPRAVA (v2.1.4) – Inactivity Disconnect
 
-**Co se změnilo oproti v2.1.2:**
-* ✅ **Auto-Connect Voice** – `/yt` automaticky připojí bota do voice kanálu, ve kterém jsi ty
-* ✅ **Žádné ruční připojování** – uživatelři už nemusí připojovat bota před přehravaním
-* ✅ **Persistent voice channel** – bot si pamš poslední voice kanál a připojí se tam při restartu
-* ✅ **Lepší error handling** – zprávy o chybách jsou jasnější
+**Co se změnilo oproti v2.1.3:**
+* ✅ **Inactivity Timer** – bot se automaticky odpojí po 2 minutách neaktivity
+* ✅ **Sniží zatížení serveru** – bot nezûstává zbytečně v prázdných kanálech
+* ✅ **Smart Timer Reset** – timer se zruší, když se přidá nová skladba
+* ✅ **Uživatelská kontrola** – `Uživatel si jejího opuotĕní boť se nestačí odpojit`
 
 **Proč upgrade?**
-- `/yt` je nyní intuitivnější a rychlejší
-- Není potřeba separátný příkaz pro připojení
-- Uživatel včy ví, do kterého kanálu se bot připojí (svůj vlastní)
+- Bot nevytáčí prostředky na váženíš serverech
+- Sníží počet botů v prázdných kanálech
+- Vhodné zejména na RPi s omezeným výkonem
 
 ---
 
@@ -327,7 +327,7 @@ python3 tools/rpi_voice_diagnostics.py
 
 ---
 
-## 🎧 Poznámky k Slash Commands (v2.1.3)
+## 🎧 Poznámky k Slash Commands (v2.1.4)
 
 ### Jak používat?
 
@@ -373,7 +373,7 @@ python3 tools/rpi_voice_diagnostics.py
 
 ## 🛣️ Roadmapa – Ježíš Discord Bot (v2.x → v3.x)
 
-### 🟩 v2.1.3 (AKTUÁLNÍ VERZE – Slash Commands Era + Voice Auto-Connect)
+### 🟩 v2.1.4 (AKTUÁLNÍ VERZE – Slash Commands Era + Inactivity Management)
 
 Nyní aktivní! Kompletní přepis na slash commands:
 * ✅ `/yt`, `/další`, `/pauza`, `/pokračuj`, `/zastav`, `/odejdi` – hudba s českými názvy

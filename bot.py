@@ -1,5 +1,5 @@
 # ╔════════════════════════════════════════════════════════════════════════════╗
-# ║           Ježíš Discord Bot v2.1.3 – Slash Commands Era                    ║
+# ║           Ježíš Discord Bot v2.1.4 – Slash Commands Era                    ║
 # ║                     Kompletní přepis na slash commands                      ║
 # ║                  s Czech názvy pro maximální unikalitu                      ║
 # ╚════════════════════════════════════════════════════════════════════════════╝
@@ -207,6 +207,7 @@ bot_loop = None
 voice_locks = {}
 last_voice_channel = {}
 recently_announced_games = set()
+voice_inactivity_timers = {}  # {guild_id: asyncio.Task}
 
 YDL_OPTS = {
     "format": "bestaudio/best",
@@ -328,10 +329,22 @@ async def play_next(guild: discord.Guild, text_channel: discord.TextChannel):
         vc = discord.utils.get(bot.voice_clients, guild=guild)
         if vc and vc.is_connected():
             now_playing[guild.id] = None
-            try:
-                await vc.disconnect()
-            except:
-                pass
+            # Nastav inactivity timer – odpoj se po 2 minutách
+            gid = guild.id
+            if gid in voice_inactivity_timers:
+                voice_inactivity_timers[gid].cancel()
+            
+            async def disconnect_after_delay():
+                await asyncio.sleep(120)  # 2 minuty
+                try:
+                    if vc.is_connected():
+                        await vc.disconnect()
+                        print(f"[music] Disconnected from {guild.name} after 2 min inactivity")
+                except:
+                    pass
+            
+            task = asyncio.create_task(disconnect_after_delay())
+            voice_inactivity_timers[gid] = task
         return
     
     song = queue.popleft()
@@ -344,6 +357,12 @@ async def play_next(guild: discord.Guild, text_channel: discord.TextChannel):
         if not vc:
             await text_channel.send("❌ Nelze se připojit k voice kanálu!")
             return
+        
+        # Zruš inactivity timer, protože se má co přehrávat
+        gid = guild.id
+        if gid in voice_inactivity_timers:
+            voice_inactivity_timers[gid].cancel()
+            del voice_inactivity_timers[gid]
         
         headers = extracted.get("headers", "")
         before_options = make_before_options(headers)
@@ -838,7 +857,7 @@ async def verze_command(interaction: discord.Interaction):
     """Show bot version and changelog."""
     try:
         embed = discord.Embed(title="ℹ️ Ježíš Discord Bot", color=discord.Color.gold())
-        embed.add_field(name="Verze", value="v2.1.3 – Slash Commands Era", inline=False)
+        embed.add_field(name="Verze", value="v2.1.4 – Slash Commands Era", inline=False)
         embed.add_field(name="Co je nového", value="""
 ✅ Kompletní přepis na slash commands
 ✅ Czech názvy pro unikalitu
@@ -855,7 +874,7 @@ async def verze_command(interaction: discord.Interaction):
 async def komandy_command(interaction: discord.Interaction):
     """Show all available commands."""
     try:
-        embed = discord.Embed(title="📋 Příkazy – Ježíš Discord Bot v2.1.3", color=discord.Color.blue())
+        embed = discord.Embed(title="📋 Příkazy – Ježíš Discord Bot v2.1.4", color=discord.Color.blue())
         embed.add_field(name="🎵 Hudba", value="""
 /yt <url> – Přehrávej z YouTube
 /další – Přeskoč
@@ -894,7 +913,7 @@ async def diag_command(interaction: discord.Interaction):
     voice_count = len(bot.voice_clients)
     embed.add_field(name="🎤 Voice", value=f"Connected: {voice_count}", inline=True)
     if bot.user:
-        embed.add_field(name="⏱️ Verze", value="v2.1.3\nSlash Commands Era", inline=True)
+        embed.add_field(name="⏱️ Verze", value="v2.1.4\nSlash Commands Era", inline=True)
     await interaction.followup.send(embed=embed)
 
 # ═══════════════════════════════════════════════════════════════════════════════
