@@ -1,5 +1,5 @@
 # ╔════════════════════════════════════════════════════════════════════════════╗
-# ║           Ježíš Discord Bot v2.1.2 – Slash Commands Era                    ║
+# ║           Ježíš Discord Bot v2.1.3 – Slash Commands Era                    ║
 # ║                     Kompletní přepis na slash commands                      ║
 # ║                  s Czech názvy pro maximální unikalitu                      ║
 # ╚════════════════════════════════════════════════════════════════════════════╝
@@ -546,10 +546,28 @@ async def yt_command(interaction: discord.Interaction, url: str):
     if not guild:
         await interaction.followup.send("❌ Musíš být na serveru!")
         return
-    vc = discord.utils.get(bot.voice_clients, guild=guild)
-    if not vc or not vc.is_connected():
-        await interaction.followup.send("❌ Bot není v voice kanálu. Připoj se do voice a zkus znovu!")
+    
+    # Zjisti, ve kterém voice kanálu je uživatel
+    user_voice_state = interaction.user.voice
+    if not user_voice_state or not user_voice_state.channel:
+        await interaction.followup.send("❌ Musíš být v voice kanálu!")
         return
+    
+    user_channel = user_voice_state.channel
+    
+    # Zjisti, zda je bot už v nějakém voice kanálu
+    vc = discord.utils.get(bot.voice_clients, guild=guild)
+    
+    # Pokud bot není připojený, připoj ho do kanálu uživatele
+    if not vc or not vc.is_connected():
+        try:
+            vc = await user_channel.connect(timeout=30.0, reconnect=True)
+            last_voice_channel[guild.id] = user_channel.id
+            await asyncio.sleep(0.5)
+        except Exception as e:
+            await interaction.followup.send(f"❌ Nemohu se připojit k voice kanálu: {str(e)[:100]}")
+            return
+    
     _queue_for(guild.id).append({"url": url})
     if not vc.is_playing():
         await play_next(guild, interaction.channel)
@@ -820,7 +838,7 @@ async def verze_command(interaction: discord.Interaction):
     """Show bot version and changelog."""
     try:
         embed = discord.Embed(title="ℹ️ Ježíš Discord Bot", color=discord.Color.gold())
-        embed.add_field(name="Verze", value="v2.1.2 – Slash Commands Era", inline=False)
+        embed.add_field(name="Verze", value="v2.1.3 – Slash Commands Era", inline=False)
         embed.add_field(name="Co je nového", value="""
 ✅ Kompletní přepis na slash commands
 ✅ Czech názvy pro unikalitu
@@ -837,7 +855,7 @@ async def verze_command(interaction: discord.Interaction):
 async def komandy_command(interaction: discord.Interaction):
     """Show all available commands."""
     try:
-        embed = discord.Embed(title="📋 Příkazy – Ježíš Discord Bot v2.1.0", color=discord.Color.blue())
+        embed = discord.Embed(title="📋 Příkazy – Ježíš Discord Bot v2.1.3", color=discord.Color.blue())
         embed.add_field(name="🎵 Hudba", value="""
 /yt <url> – Přehrávej z YouTube
 /další – Přeskoč
@@ -876,7 +894,7 @@ async def diag_command(interaction: discord.Interaction):
     voice_count = len(bot.voice_clients)
     embed.add_field(name="🎤 Voice", value=f"Connected: {voice_count}", inline=True)
     if bot.user:
-        embed.add_field(name="⏱️ Verze", value="v2.1.2\nSlash Commands Era", inline=True)
+        embed.add_field(name="⏱️ Verze", value="v2.1.3\nSlash Commands Era", inline=True)
     await interaction.followup.send(embed=embed)
 
 # ═══════════════════════════════════════════════════════════════════════════════
