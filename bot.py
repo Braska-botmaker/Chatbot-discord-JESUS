@@ -1,6 +1,12 @@
-# bot.py — v2.1.0b – Slash Commands Era (Ježíš Discord Bot)
-# Kompletní přepis na slash commands s Czech názvy pro unikalitu
-# /yt, /další, /pauza, /zastav, /odejdi, /fronta, /verse, /freegames, /bless, /komandy, /diag
+# ╔════════════════════════════════════════════════════════════════════════════╗
+# ║           Ježíš Discord Bot v2.1.2 – Slash Commands Era                    ║
+# ║                     Kompletní přepis na slash commands                      ║
+# ║                  s Czech názvy pro maximální unikalitu                      ║
+# ╚════════════════════════════════════════════════════════════════════════════╝
+
+# ═══════════════════════════════════════════════════════════════════════════════
+#                              1. IMPORTS & SETUP
+# ═══════════════════════════════════════════════════════════════════════════════
 
 import discord
 from discord.ext import commands, tasks
@@ -11,10 +17,6 @@ import os
 import requests
 from dotenv import load_dotenv
 import pytz
-from html import unescape as html_unescape
-import re
-import platform
-
 import asyncio
 from collections import deque
 from typing import Optional
@@ -22,25 +24,24 @@ import shutil
 import time
 import json
 import pathlib
-import socket
+import platform
+
 _yt_dlp = None
 
-# ===== RPi VOICE FIX: Patch Discord VoiceClient UDP connection for ARM architecture =====
-# Error 4006 occurs when discord.py's voice UDP handshake fails on Raspberry Pi.
-# Root cause: UDP packets are fragmented or discord.py sends frames that don't negotiate properly.
-# Fix: Monkeypatch VoiceClient._handshake_websocket() to retry on 4006 with exponential backoff.
+# ═══════════════════════════════════════════════════════════════════════════════
+#                    2. RPi VOICE FIX (Error 4006 Handling)
+# ═══════════════════════════════════════════════════════════════════════════════
 
 def _is_arm_system():
-    """Detect if running on ARM system (RPi, etc)."""
+    """Detekuj ARM systémy (RPi, atd)."""
     machine = platform.machine().lower()
-    # Check for various ARM architectures
     arm_variants = ['arm', 'armv6', 'armv7', 'aarch64', 'armv8']
     is_arm = any(variant in machine for variant in arm_variants)
     print(f"[RPi patch] Platform detection: machine={machine}, is_arm={is_arm}")
     return is_arm
 
 def _patch_voice_client_for_rpi():
-    """Apply 4006-specific retry logic to discord.VoiceClient."""
+    """Aplikuj 4006-specific retry logiku na discord.VoiceClient._inner_connect()."""
     is_rpi = _is_arm_system()
     if not is_rpi:
         print("[RPi patch] Not on ARM - skipping patches")
@@ -51,7 +52,7 @@ def _patch_voice_client_for_rpi():
         original_inner_connect = discord.voice_client.VoiceClient._inner_connect
         
         async def patched_inner_connect(self):
-            """Retry inner connection with exponential backoff on 4006 errors."""
+            """Retry s exponential backoff na 4006 errors."""
             max_retries = 5
             retry_delays = [0.5, 1.0, 2.0, 3.0, 5.0]
             
@@ -65,25 +66,21 @@ def _patch_voice_client_for_rpi():
                     
                     if is_4006 and attempt < max_retries - 1:
                         delay = retry_delays[attempt]
-                        print(f"[RPi patch] 4006 detected in _inner_connect, retrying in {delay}s... ({attempt+1}/{max_retries})")
+                        print(f"[RPi patch] 4006 detected, retrying in {delay}s ({attempt+1}/{max_retries})")
                         await asyncio.sleep(delay)
                         continue
-                    
                     if is_4006:
-                        print(f"[RPi patch] 4006 error persisted after {max_retries} _inner_connect attempts")
+                        print(f"[RPi patch] 4006 persisted after {max_retries} attempts")
                     raise
-            
             return None
         
         discord.voice_client.VoiceClient._inner_connect = patched_inner_connect
-        print("[RPi patch] ✅ Applied to VoiceClient._inner_connect - 4006 retry logic active")
+        print("[RPi patch] ✅ Applied to VoiceClient._inner_connect")
     except Exception as e:
-        print(f"[RPi patch] ⚠️ Warning: Failed to patch _inner_connect: {e}")
-
-_patch_voice_client_for_rpi()
+        print(f"[RPi patch] ⚠️ Failed to patch _inner_connect: {e}")
 
 def _patch_voice_connect_for_rpi():
-    """Add resilience to ch.connect() calls by catching and retrying 4006 internally."""
+    """Přidej resiliensi na ch.connect() s retry pro 4006."""
     is_rpi = _is_arm_system()
     if not is_rpi:
         return
@@ -93,12 +90,10 @@ def _patch_voice_connect_for_rpi():
         original_connect = discord.voice_client.VoiceClient.connect
         
         async def patched_connect(self, *, timeout=60.0, reconnect=False, self_deaf=False, self_mute=False, **kwargs):
-            """Wrap connect() to retry on 4006 errors with extended timeout."""
             retry_count = 0
             max_retries = 4
             extended_timeout = 30.0
             base_delay = 0.5
-            
             actual_timeout = extended_timeout if timeout == 60.0 else timeout
             
             while retry_count < max_retries:
@@ -115,11 +110,11 @@ def _patch_voice_connect_for_rpi():
                 except asyncio.TimeoutError:
                     if retry_count < max_retries - 1:
                         delay = base_delay * (1.5 ** retry_count)
-                        print(f"[RPi patch] Timeout in connect(), retrying in {delay}s ({retry_count+1}/{max_retries})")
+                        print(f"[RPi patch] Timeout, retrying in {delay}s ({retry_count+1}/{max_retries})")
                         retry_count += 1
                         await asyncio.sleep(delay)
                         continue
-                    print(f"[RPi patch] Timeout persisted after {max_retries} connect() attempts")
+                    print(f"[RPi patch] Timeout persisted after {max_retries} attempts")
                     raise
                 except Exception as e:
                     error_msg = str(e)
@@ -127,21 +122,25 @@ def _patch_voice_connect_for_rpi():
                     
                     if is_4006 and retry_count < max_retries - 1:
                         delay = base_delay * (1.5 ** retry_count)
-                        print(f"[RPi patch] 4006 in connect(), retrying in {delay}s ({retry_count+1}/{max_retries})")
+                        print(f"[RPi patch] 4006 in connect(), retrying in {delay}s")
                         retry_count += 1
                         await asyncio.sleep(delay)
                         continue
-                    
                     if is_4006:
-                        print(f"[RPi patch] 4006 persisted after {max_retries} connect() attempts")
+                        print(f"[RPi patch] 4006 persisted after {max_retries} attempts")
                     raise
         
         discord.voice_client.VoiceClient.connect = patched_connect
-        print("[RPi patch] ✅ Applied to VoiceClient.connect() - 4006 resilience active")
+        print("[RPi patch] ✅ Applied to VoiceClient.connect()")
     except Exception as e:
-        print(f"[RPi patch] ❌ Warning: Failed to patch connect(): {e}")
+        print(f"[RPi patch] ❌ Failed to patch connect(): {e}")
 
+_patch_voice_client_for_rpi()
 _patch_voice_connect_for_rpi()
+
+# ═══════════════════════════════════════════════════════════════════════════════
+#                      3. BOT INITIALIZATION & INTENTS
+# ═══════════════════════════════════════════════════════════════════════════════
 
 load_dotenv()
 TOKEN = os.getenv("DISCORD_TOKEN")
@@ -154,7 +153,9 @@ intents.voice_states = True
 
 bot = commands.Bot(command_prefix="/", intents=intents)
 
-# ===== CONFIGURATION & DATA =====
+# ═══════════════════════════════════════════════════════════════════════════════
+#                    4. DATA STORAGE & CONFIGURATION
+# ═══════════════════════════════════════════════════════════════════════════════
 
 DATA_FILE = pathlib.Path("bot_data.json")
 _data_lock = asyncio.Lock()
@@ -175,9 +176,9 @@ def _g(db, gid, key, default):
     """Guild-specific data namespace"""
     return db.setdefault(str(gid), {}).setdefault(key, default)
 
-# ===== MUSIC SYSTEM =====
-
-recently_announced_games = set()
+# ═══════════════════════════════════════════════════════════════════════════════
+#                      5. AUDIO DETECTION & SETUP
+# ═══════════════════════════════════════════════════════════════════════════════
 
 try:
     import nacl
@@ -196,23 +197,16 @@ if not HAS_OPUS:
         except Exception:
             pass
 
+# ═══════════════════════════════════════════════════════════════════════════════
+#                  6. MUSIC SYSTEM VARIABLES & FUNCTIONS
+# ═══════════════════════════════════════════════════════════════════════════════
+
 music_queues = {}
 now_playing = {}
 bot_loop = None
-
-# ===== VERSE STREAK TRACKING =====
-verse_streak = {}  # {user_id: {"count": int, "last_date": date}}
-streak_messages = {
-    0: "🎯 Začínáš svou cestu k Bohu! Veď ji s vírou.",
-    1: "✨ 1 den! Pokračuj v modlitbě.",
-    3: "🌟 3 dny! Bůh tě vidí a chválí.",
-    7: "⭐ Týden! Tvá věrnost je krásná.",
-    14: "💫 Dva týdny! Sláva tobě věrnému!",
-    30: "🏆 Měsíc věry! Bůh tě požehná.",
-    60: "👑 Dva měsíce! Jsi příkladem víry.",
-    90: "🎖️ Tři měsíce! Nebeské vojska tě chválí!",
-    365: "🌈 Rok! Tvá věrnost je vzorem pro všechny!",
-}
+voice_locks = {}
+last_voice_channel = {}
+recently_announced_games = set()
 
 YDL_OPTS = {
     "format": "bestaudio/best",
@@ -231,7 +225,173 @@ FFMPEG_RECONNECT = "-reconnect 1 -reconnect_streamed 1 -reconnect_delay_max 5 -r
 FFMPEG_OPTIONS = "-vn -ac 1 -b:a 128k -bufsize 256k"
 FFMPEG_OPTIONS_RPi = "-vn -ac 1 -b:a 96k -bufsize 128k"
 
-# ===== DATA: Verses & Blessings =====
+def get_ffmpeg_options():
+    """Vrať optimalizované FFmpeg options (RPi má nižší bitrate)."""
+    is_rpi = _is_arm_system()
+    return FFMPEG_OPTIONS_RPi if is_rpi else FFMPEG_OPTIONS
+
+def has_ffmpeg() -> bool:
+    return shutil.which("ffmpeg") is not None
+
+def _headers_str_from_info(info: dict) -> str:
+    """Extrahuj HTTP headery z yt-dlp info dict."""
+    headers = info.get("http_headers") or {}
+    return "".join(f"{k}: {v}\r\n" for k, v in headers.items())
+
+def make_before_options(headers_str: str) -> str:
+    """Vytvoř before_options pro FFmpeg včetně HTTP headerů."""
+    if not headers_str:
+        return FFMPEG_RECONNECT
+    safe = headers_str.replace('"', r'\"')
+    return f'{FFMPEG_RECONNECT} -headers "{safe}"'
+
+def ytdlp_extract(url: str):
+    """Extrahuj URL a headery z YouTube/stream. Retry na timeout."""
+    max_retries = 2
+    last_err = None
+    
+    for attempt in range(max_retries):
+        try:
+            with _yt_dlp.YoutubeDL(YDL_OPTS) as ydl:
+                info = ydl.extract_info(url, download=False)
+                if "entries" in info:
+                    if not info["entries"]:
+                        raise ValueError("Playlist je prázdný nebo žádné videa")
+                    info = info["entries"][0]
+                
+                if not info.get("url"):
+                    raise ValueError("Žádné audio URL v odpovědi yt-dlp")
+                
+                return {
+                    "title": info.get("title", "Unknown"),
+                    "url": info["url"],
+                    "webpage_url": info.get("webpage_url") or url,
+                    "headers": _headers_str_from_info(info),
+                }
+        except Exception as e:
+            last_err = e
+            if attempt < max_retries - 1:
+                print(f"[yt-dlp extract attempt {attempt+1}] {type(e).__name__}: {e}")
+                time.sleep(1)
+            continue
+    
+    raise last_err
+
+def _queue_for(guild_id: int) -> deque:
+    if guild_id not in music_queues:
+        music_queues[guild_id] = deque()
+    return music_queues[guild_id]
+
+def _guild_lock(gid: int) -> asyncio.Lock:
+    if gid not in voice_locks:
+        voice_locks[gid] = asyncio.Lock()
+    return voice_locks[gid]
+
+async def wait_until_connected(vc: Optional[discord.VoiceClient], tries: int = 15, delay: float = 0.3) -> bool:
+    """Opakovaně zkontroluj, zda je voice skutečně připojený."""
+    for i in range(tries):
+        if vc and vc.is_connected():
+            await asyncio.sleep(0.1)
+            return True
+        wait_time = delay * (i + 1) if i < 3 else delay * 3
+        await asyncio.sleep(wait_time)
+    return False
+
+async def ensure_voice_by_guild(guild: discord.Guild, *, text_channel: Optional[discord.TextChannel] = None) -> Optional[discord.VoiceClient]:
+    """Zajisti voice connection pro guild."""
+    gid = guild.id
+    async with _guild_lock(gid):
+        existing_vc = discord.utils.get(bot.voice_clients, guild=guild)
+        if existing_vc and existing_vc.is_connected():
+            return existing_vc
+        
+        last_ch_id = last_voice_channel.get(gid)
+        if last_ch_id:
+            last_ch = guild.get_channel(last_ch_id)
+            if last_ch and isinstance(last_ch, discord.VoiceChannel):
+                try:
+                    vc = await last_ch.connect(timeout=30.0, reconnect=True)
+                    connected = await wait_until_connected(vc, tries=10, delay=0.3)
+                    if connected:
+                        print(f"[voice] Reconnected to {last_ch.name} in {guild.name}")
+                        return vc
+                except Exception as e:
+                    print(f"[voice] Failed to reconnect to {last_ch.name}: {e}")
+        return None
+
+async def play_next(guild: discord.Guild, text_channel: discord.TextChannel):
+    """Přehrávej další skladbu v frontě."""
+    queue = _queue_for(guild.id)
+    
+    if not queue:
+        print(f"[music] Queue empty in {guild.name}")
+        vc = discord.utils.get(bot.voice_clients, guild=guild)
+        if vc and vc.is_connected():
+            now_playing[guild.id] = None
+            try:
+                await vc.disconnect()
+            except:
+                pass
+        return
+    
+    song = queue.popleft()
+    
+    try:
+        print(f"[music] Extracting: {song['url']}")
+        extracted = ytdlp_extract(song['url'])
+        
+        vc = await ensure_voice_by_guild(guild, text_channel=text_channel)
+        if not vc:
+            await text_channel.send("❌ Nelze se připojit k voice kanálu!")
+            return
+        
+        headers = extracted.get("headers", "")
+        before_options = make_before_options(headers)
+        source = discord.FFmpegOpusAudio(
+            extracted["url"],
+            before_options=before_options,
+            options=get_ffmpeg_options()
+        )
+        
+        now_playing[guild.id] = extracted["title"]
+        
+        def after_play(error):
+            if error:
+                print(f"[music] Playback error: {error}")
+            asyncio.run_coroutine_threadsafe(
+                play_next(guild, text_channel),
+                bot.loop
+            )
+        
+        vc.play(source, after=after_play)
+        embed = discord.Embed(title="🎵 Přehrávám", description=extracted["title"], color=discord.Color.blue())
+        await text_channel.send(embed=embed)
+        
+    except Exception as e:
+        now_playing[guild.id] = None
+        await text_channel.send(f"❌ Chyba při přehrávání: {str(e)[:100]}")
+        print(f"[music] Error: {e}")
+
+# ═══════════════════════════════════════════════════════════════════════════════
+#                   7. VERSE STREAK TRACKING DATA
+# ═══════════════════════════════════════════════════════════════════════════════
+
+verse_streak = {}  # {user_id: {"count": int, "last_date": date}}
+streak_messages = {
+    0: "🎯 Začínáš svou cestu k Bohu! Veď ji s vírou.",
+    1: "✨ 1 den! Pokračuj v modlitbě.",
+    3: "🌟 3 dny! Bůh tě vidí a chválí.",
+    7: "⭐ Týden! Tvá věrnost je krásná.",
+    14: "💫 Dva týdny! Sláva tobě věrnému!",
+    30: "🏆 Měsíc věry! Bůh tě požehná.",
+    60: "👑 Dva měsíce! Jsi příkladem víry.",
+    90: "🎖️ Tři měsíce! Nebeské vojska tě chválí!",
+    365: "🌈 Rok! Tvá věrnost je vzorem pro všechny!",
+}
+
+# ═══════════════════════════════════════════════════════════════════════════════
+#                 8. BIBLICKÉ VERŠE (55 kousků)
+# ═══════════════════════════════════════════════════════════════════════════════
 
 verses = [
     '"Bůh je láska, a kdo zůstává v lásce, zůstává v Bohu a Bůh v něm." (1 Jan 4,16)',
@@ -289,6 +449,10 @@ verses = [
     '"Bůh není Bůh těch mrtvých, ale živých." (Marek 12,27)'
 ]
 
+# ═══════════════════════════════════════════════════════════════════════════════
+#              9. GAME BLESSINGS DICTIONARY (53 her)
+# ═══════════════════════════════════════════════════════════════════════════════
+
 game_blessings = {
     "League of Legends": "Ať tě neodvede do pokušení toxicit, ale zbaví tě feederů.",
     "Counter-Strike 2": "Ať jsou tvé reflexy rychlé a spoluhráči nejsou AFK.",
@@ -341,165 +505,23 @@ game_blessings = {
     "Fallout 76": "Ať v pustině narazíš na živý lidi a ne jen na mrtvý servery a prázdný lokace.",
     "Kingdom Come: Deliverance": "Ať tvoje jízdy na Šedivce kolem Ratají skončí vždycky na sedle, ne na zemi.",
     "Kingdom Come: Deliverance II": "Ať se Jindra dočká své odvety a království zůstane v bezpečí.",
+    "Outlast": "Ať tě Chris Walker nikdy nedostane.",
+    "Outlast 2": "Ať tě basketbalistka nikdy nedostane.",
+    "The Outlast Trials": "Ať testy přežiješ se všemi končetinami a žaludkem na místě.",
 }
 
-def get_ffmpeg_options():
-    """Return FFmpeg options optimized for platform (RPi uses lower bitrate)."""
-    is_rpi = _is_arm_system()
-    return FFMPEG_OPTIONS_RPi if is_rpi else FFMPEG_OPTIONS
-
-def has_ffmpeg() -> bool:
-    return shutil.which("ffmpeg") is not None
-
-def _headers_str_from_info(info: dict) -> str:
-    """Extract HTTP headers from yt-dlp info dict."""
-    headers = info.get("http_headers") or {}
-    return "".join(f"{k}: {v}\r\n" for k, v in headers.items())
-
-def make_before_options(headers_str: str) -> str:
-    """Compose before_options for FFmpeg including HTTP headers."""
-    if not headers_str:
-        return FFMPEG_RECONNECT
-    safe = headers_str.replace('"', r'\"')
-    return f'{FFMPEG_RECONNECT} -headers "{safe}"'
-
-def ytdlp_extract(url: str):
-    """Extract URL and headers from YouTube/stream. Retry on timeout."""
-    max_retries = 2
-    last_err = None
-    
-    for attempt in range(max_retries):
-        try:
-            with _yt_dlp.YoutubeDL(YDL_OPTS) as ydl:
-                info = ydl.extract_info(url, download=False)
-                if "entries" in info:
-                    if not info["entries"]:
-                        raise ValueError("Playlist je prázdný nebo žádné videa")
-                    info = info["entries"][0]
-                
-                if not info.get("url"):
-                    raise ValueError("Žádné audio URL v odpovědi yt-dlp")
-                
-                return {
-                    "title": info.get("title", "Unknown"),
-                    "url": info["url"],
-                    "webpage_url": info.get("webpage_url") or url,
-                    "headers": _headers_str_from_info(info),
-                }
-        except Exception as e:
-            last_err = e
-            if attempt < max_retries - 1:
-                print(f"[yt-dlp extract attempt {attempt+1}] {type(e).__name__}: {e}")
-                time.sleep(1)
-            continue
-    
-    raise last_err
-
-def _queue_for(guild_id: int) -> deque:
-    if guild_id not in music_queues:
-        music_queues[guild_id] = deque()
-    return music_queues[guild_id]
-
-voice_locks = {}
-last_voice_channel = {}
-
-def _guild_lock(gid: int) -> asyncio.Lock:
-    if gid not in voice_locks:
-        voice_locks[gid] = asyncio.Lock()
-    return voice_locks[gid]
-
-async def wait_until_connected(vc: Optional[discord.VoiceClient], tries: int = 15, delay: float = 0.3) -> bool:
-    """Opakovaně zkontroluje, zda je voice skutečně připojený."""
-    for i in range(tries):
-        if vc and vc.is_connected():
-            await asyncio.sleep(0.1)
-            return True
-        wait_time = delay * (i + 1) if i < 3 else delay * 3
-        await asyncio.sleep(wait_time)
-    return False
-
-async def ensure_voice_by_guild(guild: discord.Guild, *, text_channel: Optional[discord.TextChannel] = None) -> Optional[discord.VoiceClient]:
-    """Ensure voice connection for guild. Přihlásí se do poslední známé voice channel."""
-    gid = guild.id
-    async with _guild_lock(gid):
-        existing_vc = discord.utils.get(bot.voice_clients, guild=guild)
-        if existing_vc and existing_vc.is_connected():
-            return existing_vc
-        
-        last_ch_id = last_voice_channel.get(gid)
-        if last_ch_id:
-            last_ch = guild.get_channel(last_ch_id)
-            if last_ch and isinstance(last_ch, discord.VoiceChannel):
-                try:
-                    vc = await last_ch.connect(timeout=30.0, reconnect=True)
-                    connected = await wait_until_connected(vc, tries=10, delay=0.3)
-                    if connected:
-                        print(f"[voice] Reconnected to {last_ch.name} in {guild.name}")
-                        return vc
-                except Exception as e:
-                    print(f"[voice] Failed to reconnect to {last_ch.name}: {e}")
-        
-        return None
-
-async def play_next(guild: discord.Guild, text_channel: discord.TextChannel):
-    """Play next song in queue."""
-    queue = _queue_for(guild.id)
-    
-    if not queue:
-        print(f"[music] Queue empty in {guild.name}")
-        vc = discord.utils.get(bot.voice_clients, guild=guild)
-        if vc and vc.is_connected():
-            now_playing[guild.id] = None
-            try:
-                await vc.disconnect()
-            except:
-                pass
-        return
-    
-    song = queue.popleft()
-    
-    try:
-        print(f"[music] Extracting: {song['url']}")
-        extracted = ytdlp_extract(song['url'])
-        
-        vc = await ensure_voice_by_guild(guild, text_channel=text_channel)
-        if not vc:
-            await text_channel.send("❌ Nelze se připojit k voice kanálu!")
-            return
-        
-        headers = extracted.get("headers", "")
-        before_options = make_before_options(headers)
-        source = discord.FFmpegOpusAudio(
-            extracted["url"],
-            before_options=before_options,
-            options=get_ffmpeg_options()
-        )
-        
-        now_playing[guild.id] = extracted["title"]
-        
-        def after_play(error):
-            if error:
-                print(f"[music] Playback error: {error}")
-            asyncio.run_coroutine_threadsafe(
-                play_next(guild, text_channel),
-                bot.loop
-            )
-        
-        vc.play(source, after=after_play)
-        embed = discord.Embed(title="🎵 Přehrávám", description=extracted["title"], color=discord.Color.blue())
-        await text_channel.send(embed=embed)
-        
-    except Exception as e:
-        now_playing[guild.id] = None
-        await text_channel.send(f"❌ Chyba při přehrávání: {str(e)[:100]}")
-        print(f"[music] Error: {e}")
-
-# ===== SLASH COMMANDS =====
+# ═══════════════════════════════════════════════════════════════════════════════
+#                  10. BOT EVENTS – STARTUP & READY
+# ═══════════════════════════════════════════════════════════════════════════════
 
 @bot.event
 async def on_ready():
-    """Bot startup event."""
+    """Bot startup event – synchronizuj slash commands a spusť scheduled tasks."""
     print(f"✅ Bot je přihlášen jako {bot.user}")
+    
+    # Načti verse streak z storage
+    await load_verse_streak_from_storage()
+    
     try:
         synced = await bot.tree.sync()
         print(f"[commands] Synced {len(synced)} slash commands")
@@ -512,25 +534,23 @@ async def on_ready():
     voice_watchdog.start()
     clear_recent_announcements.start()
 
-# HUDBA / MUSIC
+# ═══════════════════════════════════════════════════════════════════════════════
+#                11. SLASH COMMANDS – HUDBA / MUSIC
+# ═══════════════════════════════════════════════════════════════════════════════
 
 @bot.tree.command(name="yt", description="Přidej skladbu do fronty a přehrávej z YouTube")
 async def yt_command(interaction: discord.Interaction, url: str):
     """Slash command /yt – přehrávání hudby z YouTube."""
     await interaction.response.defer()
-    
     guild = interaction.guild
     if not guild:
         await interaction.followup.send("❌ Musíš být na serveru!")
         return
-    
     vc = discord.utils.get(bot.voice_clients, guild=guild)
     if not vc or not vc.is_connected():
         await interaction.followup.send("❌ Bot není v voice kanálu. Připoj se do voice a zkus znovu!")
         return
-    
     _queue_for(guild.id).append({"url": url})
-    
     if not vc.is_playing():
         await play_next(guild, interaction.channel)
         await interaction.followup.send(f"▶️ Začínám přehrávat: {url}")
@@ -543,18 +563,13 @@ async def dalsi_command(interaction: discord.Interaction):
     try:
         guild = interaction.guild
         vc = discord.utils.get(bot.voice_clients, guild=guild)
-        
         if not vc or not vc.is_playing():
             await interaction.response.send_message("❌ Nic se nehraje!")
             return
-        
         vc.stop()
         await interaction.response.send_message("⏭️ Přeskočeno!")
     except Exception as e:
-        try:
-            await interaction.response.send_message(f"❌ Chyba: {str(e)[:100]}")
-        except:
-            pass
+        await interaction.response.send_message(f"❌ Chyba: {str(e)[:100]}")
 
 @bot.tree.command(name="pauza", description="Pozastavit přehrávání")
 async def pauza_command(interaction: discord.Interaction):
@@ -562,18 +577,13 @@ async def pauza_command(interaction: discord.Interaction):
     try:
         guild = interaction.guild
         vc = discord.utils.get(bot.voice_clients, guild=guild)
-        
         if not vc or not vc.is_playing():
             await interaction.response.send_message("❌ Nic se nehraje!")
             return
-        
         vc.pause()
         await interaction.response.send_message("⏸️ Pozastaveno!")
     except Exception as e:
-        try:
-            await interaction.response.send_message(f"❌ Chyba: {str(e)[:100]}")
-        except:
-            pass
+        await interaction.response.send_message(f"❌ Chyba: {str(e)[:100]}")
 
 @bot.tree.command(name="pokračuj", description="Pokračovat v přehrávání")
 async def pokracuj_command(interaction: discord.Interaction):
@@ -581,21 +591,16 @@ async def pokracuj_command(interaction: discord.Interaction):
     try:
         guild = interaction.guild
         vc = discord.utils.get(bot.voice_clients, guild=guild)
-        
         if not vc:
             await interaction.response.send_message("❌ Bot není v voice!")
             return
-        
         if vc.is_paused():
             vc.resume()
             await interaction.response.send_message("▶️ Pokračuju!")
         else:
             await interaction.response.send_message("❌ Nic není pozastaveno!")
     except Exception as e:
-        try:
-            await interaction.response.send_message(f"❌ Chyba: {str(e)[:100]}")
-        except:
-            pass
+        await interaction.response.send_message(f"❌ Chyba: {str(e)[:100]}")
 
 @bot.tree.command(name="zastav", description="Zastavit přehrávání")
 async def zastav_command(interaction: discord.Interaction):
@@ -603,22 +608,16 @@ async def zastav_command(interaction: discord.Interaction):
     try:
         guild = interaction.guild
         vc = discord.utils.get(bot.voice_clients, guild=guild)
-        
         if not vc:
             await interaction.response.send_message("❌ Bot není v voice!")
             return
-        
         if vc.is_playing():
             vc.stop()
-        
         _queue_for(guild.id).clear()
         now_playing[guild.id] = None
         await interaction.response.send_message("⏹️ Zastaveno! Fronta smazána.")
     except Exception as e:
-        try:
-            await interaction.response.send_message(f"❌ Chyba: {str(e)[:100]}")
-        except:
-            pass
+        await interaction.response.send_message(f"❌ Chyba: {str(e)[:100]}")
 
 @bot.tree.command(name="odejdi", description="Odpoj se z voice kanálu")
 async def odejdi_command(interaction: discord.Interaction):
@@ -626,24 +625,17 @@ async def odejdi_command(interaction: discord.Interaction):
     try:
         guild = interaction.guild
         vc = discord.utils.get(bot.voice_clients, guild=guild)
-        
         if not vc:
             await interaction.response.send_message("❌ Bot není v voice!")
             return
-        
         if vc.is_playing():
             vc.stop()
-        
         _queue_for(guild.id).clear()
         now_playing[guild.id] = None
-        
         await vc.disconnect()
         await interaction.response.send_message("👋 Odešel jsem z voice kanálu.")
     except Exception as e:
-        try:
-            await interaction.response.send_message(f"❌ Chyba: {str(e)[:100]}")
-        except:
-            pass
+        await interaction.response.send_message(f"❌ Chyba: {str(e)[:100]}")
 
 @bot.tree.command(name="np", description="Zobraz právě přehrávanou skladbu")
 async def np_command(interaction: discord.Interaction):
@@ -651,19 +643,14 @@ async def np_command(interaction: discord.Interaction):
     try:
         guild = interaction.guild
         vc = discord.utils.get(bot.voice_clients, guild=guild)
-        
         if not vc or not vc.is_playing():
             await interaction.response.send_message("❌ Nic se nehraje!")
             return
-        
         title = now_playing.get(guild.id, "Unknown")
         embed = discord.Embed(title="🎵 Právě hraje", description=title, color=discord.Color.blue())
         await interaction.response.send_message(embed=embed)
     except Exception as e:
-        try:
-            await interaction.response.send_message(f"❌ Chyba: {str(e)[:100]}")
-        except:
-            pass
+        await interaction.response.send_message(f"❌ Chyba: {str(e)[:100]}")
 
 @bot.tree.command(name="fronta", description="Zobraz hudební frontu")
 async def fronta_command(interaction: discord.Interaction):
@@ -671,32 +658,24 @@ async def fronta_command(interaction: discord.Interaction):
     try:
         guild = interaction.guild
         queue = _queue_for(guild.id)
-        
         if not queue:
             await interaction.response.send_message("❌ Fronta je prázdná!")
             return
-        
         items = "\n".join(f"{i+1}. {item['url']}" for i, item in enumerate(list(queue)[:10]))
         embed = discord.Embed(title="🎵 Fronta", description=items, color=discord.Color.blue())
         await interaction.response.send_message(embed=embed)
     except Exception as e:
-        try:
-            await interaction.response.send_message(f"❌ Chyba: {str(e)[:100]}")
-        except:
-            pass
+        await interaction.response.send_message(f"❌ Chyba: {str(e)[:100]}")
 
 @bot.tree.command(name="vtest", description="Test voice připojení")
 async def vtest_command(interaction: discord.Interaction):
     """Test voice connection."""
     await interaction.response.defer()
-    
     guild = interaction.guild
     vc = discord.utils.get(bot.voice_clients, guild=guild)
-    
     if not vc or not vc.is_connected():
         await interaction.followup.send("❌ Bot není v voice kanálu!")
         return
-    
     try:
         source = discord.FFmpegOpusAudio(
             "pipe:",
@@ -712,7 +691,52 @@ async def vtest_command(interaction: discord.Interaction):
     except Exception as e:
         await interaction.followup.send(f"❌ Voice test selhalo: {str(e)[:100]}")
 
-# OSTATNÍ / OTHER
+# ═══════════════════════════════════════════════════════════════════════════════
+#              12. SLASH COMMANDS – OSTATNÍ / OTHER
+# ═══════════════════════════════════════════════════════════════════════════════
+
+async def load_verse_streak_from_storage():
+    """Načti verse streak z persistent storage (bot_data.json)."""
+    global verse_streak
+    try:
+        db = _load_data()
+        if "verse_streak" in db:
+            # Konvertuj string keys na int a dates na datetime.date
+            streak_data = db["verse_streak"]
+            for user_id_str, data in streak_data.items():
+                user_id = int(user_id_str)
+                last_date = None
+                if data.get("last_date"):
+                    try:
+                        last_date = datetime.datetime.strptime(data["last_date"], "%Y-%m-%d").date()
+                    except:
+                        last_date = None
+                verse_streak[user_id] = {
+                    "count": data.get("count", 0),
+                    "last_date": last_date
+                }
+            print(f"[verse] Loaded verse streak for {len(verse_streak)} users")
+    except Exception as e:
+        print(f"[verse] Failed to load verse streak: {e}")
+
+async def save_verse_streak_to_storage():
+    """Ulož verse streak do persistent storage (bot_data.json)."""
+    try:
+        db = _load_data()
+        # Konvertuj datetime.date na string
+        streak_data = {}
+        for user_id, data in verse_streak.items():
+            last_date_str = None
+            if data["last_date"]:
+                last_date_str = data["last_date"].isoformat()
+            streak_data[str(user_id)] = {
+                "count": data["count"],
+                "last_date": last_date_str
+            }
+        db["verse_streak"] = streak_data
+        await _save_data(db)
+    except Exception as e:
+        print(f"[verse] Failed to save verse streak: {e}")
 
 @bot.tree.command(name="verse", description="Random biblický verš")
 async def verse_command(interaction: discord.Interaction):
@@ -720,14 +744,9 @@ async def verse_command(interaction: discord.Interaction):
     try:
         user_id = interaction.user.id
         today = datetime.date.today()
-        
-        # Initialize streak if needed
         if user_id not in verse_streak:
             verse_streak[user_id] = {"count": 0, "last_date": None}
-        
         user_streak = verse_streak[user_id]
-        
-        # Check if user already got verse today
         if user_streak["last_date"] == today:
             streak_count = user_streak["count"]
             selected = random.choice(verses)
@@ -736,50 +755,39 @@ async def verse_command(interaction: discord.Interaction):
             embed.add_field(name="🔥 Série", value=message, inline=False)
             await interaction.response.send_message(embed=embed)
             return
-        
-        # Check if streak continues (yesterday)
         yesterday = today - datetime.timedelta(days=1)
         if user_streak["last_date"] == yesterday:
-            # Streak continues!
             user_streak["count"] += 1
         else:
-            # Streak broken or first time
             user_streak["count"] = 1
-        
         user_streak["last_date"] = today
         streak_count = user_streak["count"]
-        
-        # Get milestone message
         milestone_msg = ""
         for days in sorted(streak_messages.keys(), reverse=True):
             if streak_count >= days:
                 milestone_msg = f"\n\n🎉 {streak_messages[days]}"
                 break
-        
         selected = random.choice(verses)
         embed = discord.Embed(title="📖 Biblický Verš", description=selected, color=discord.Color.gold())
         embed.add_field(name="🔥 Tvoje série", value=f"**{streak_count}** dní\n{milestone_msg}", inline=False)
         await interaction.response.send_message(embed=embed)
+        
+        # Ulož streak do storage
+        await save_verse_streak_to_storage()
     except Exception as e:
-        try:
-            await interaction.response.send_message(f"❌ Chyba: {str(e)[:100]}")
-        except:
-            pass
+        await interaction.response.send_message(f"❌ Chyba: {str(e)[:100]}")
 
-@bot.tree.command(name="freegames", description="Hry zdarma – Epic Games, Steam")
+@bot.tree.command(name="freegames", description="Hry zdarma – Epic Games")
 async def freegames_command(interaction: discord.Interaction):
     """Show free games from Epic Games Store."""
     await interaction.response.defer()
-    
     try:
         response = requests.get("https://store-site-backend-static.ak.epicgames.com/freeGamesPromotions", timeout=10)
         data = response.json()
-        
         games = []
         for elem in data.get("data", {}).get("Catalog", {}).get("searchStore", {}).get("elements", [])[:5]:
             if elem.get("promotions", {}).get("promotionalOffers"):
                 games.append(elem.get("title", "Unknown"))
-        
         if games:
             desc = "\n".join(f"• {g}" for g in games)
             embed = discord.Embed(title="🎁 Epic Games – Zdarma", description=desc, color=discord.Color.purple())
@@ -789,120 +797,95 @@ async def freegames_command(interaction: discord.Interaction):
     except Exception as e:
         await interaction.followup.send(f"❌ Chyba: {str(e)[:100]}")
 
-@bot.tree.command(name="verze", description="Info o verzi botu")
-async def verze_command(interaction: discord.Interaction):
-    """Show bot version and changelog."""
-    try:
-        embed = discord.Embed(title="ℹ️ Ježíš Discord Bot", color=discord.Color.gold())
-        embed.add_field(name="Verze", value="v2.1.C – Slash Commands Era", inline=False)
-        embed.add_field(name="Co je nového", value="""
-✅ Kompletní přepis na slash commands
-✅ Czech názvy pro unikalitu
-✅ `/yt` místo `/play`
-✅ `/další`, `/pauza`, `/pokračuj`, `/zastav`, `/odejdi`, `/fronta`
-✅ `/verse`, `/freegames`, `/bless`, `/komandy`, `/diag`
-❌ konec pingovaní u automatických zpráv                   
-""", inline=False)
-        embed.add_field(name="GitHub", value="https://github.com/Braska-botmaker/Chatbot-discord-JESUS", inline=False)
-        await interaction.response.send_message(embed=embed)
-    except Exception as e:
-        try:
-            await interaction.response.send_message(f"❌ Chyba: {str(e)[:100]}")
-        except:
-            pass
-
 @bot.tree.command(name="bless", description="Požehnání pro uživatele")
 async def bless_command(interaction: discord.Interaction, user: discord.User = None):
     """Send blessing to user."""
     try:
         target = user or interaction.user
-        # Try to use game_blessings if available, fallback to generic blessings
         all_blessings = list(game_blessings.values()) + [
             f"🙏 {target.mention}, Bůh tě požehná v každém kroku!",
-            f"✝️ {target.mention}, sila a láska Boží jsou s tebou!",
+            f"✝️ {target.mention}, síla a láska Boží jsou s tebou!",
             f"💫 {target.mention}, přeji ti pokoj a radost v Kristu!",
         ]
-        
         selected = random.choice(all_blessings)
-        # Add mention if it's a game blessing (doesn't have mention already)
         if target.mention not in selected:
             selected = f"{target.mention}, {selected}"
-        
         embed = discord.Embed(description=selected, color=discord.Color.gold())
         await interaction.response.send_message(embed=embed)
     except Exception as e:
-        try:
-            await interaction.response.send_message(f"❌ Chyba: {str(e)[:100]}")
-        except:
-            pass
+        await interaction.response.send_message(f"❌ Chyba: {str(e)[:100]}")
+
+@bot.tree.command(name="verze", description="Info o verzi botu")
+async def verze_command(interaction: discord.Interaction):
+    """Show bot version and changelog."""
+    try:
+        embed = discord.Embed(title="ℹ️ Ježíš Discord Bot", color=discord.Color.gold())
+        embed.add_field(name="Verze", value="v2.1.2 – Slash Commands Era", inline=False)
+        embed.add_field(name="Co je nového", value="""
+✅ Kompletní přepis na slash commands
+✅ Czech názvy pro unikalitu
+✅ Game presence tracking se speciálními blessings
+✅ Daily verse streak s milestones
+❌ Žádné @ mention u automatických zpráv
+""", inline=False)
+        embed.add_field(name="GitHub", value="https://github.com/Braska-botmaker/Chatbot-discord-JESUS", inline=False)
+        await interaction.response.send_message(embed=embed)
+    except Exception as e:
+        await interaction.response.send_message(f"❌ Chyba: {str(e)[:100]}")
 
 @bot.tree.command(name="komandy", description="Všechny dostupné příkazy")
 async def komandy_command(interaction: discord.Interaction):
     """Show all available commands."""
     try:
         embed = discord.Embed(title="📋 Příkazy – Ježíš Discord Bot v2.1.0", color=discord.Color.blue())
-        
         embed.add_field(name="🎵 Hudba", value="""
-/yt <url> – Přehrávej hudbu z YouTube
-/další – Přeskoč písničku
+/yt <url> – Přehrávej z YouTube
+/další – Přeskoč
 /pauza – Pozastav
 /pokračuj – Pokračuj
-/zastav – Zastavit a vyčistit frontu
+/zastav – Zastavit & vyčistit
 /odejdi – Odejít z voice
 /np – Co se hraje
 /fronta – Zobraz frontu
 /vtest – Test voice
 """, inline=False)
-        
         embed.add_field(name="📖 Ostatní", value="""
 /verze – Info o verzi
-/verse – Náhodný biblický verš
-/freegames – Hry zdarma (Epic, Steam)
+/verse – Náhodný verš
+/freegames – Hry zdarma
 /bless [@user] – Požehnání
 /diag – Diagnostika
-/komandy – Seznam příkazů
+/komandy – Tohle
 """, inline=False)
-        
         await interaction.response.send_message(embed=embed)
     except Exception as e:
-        try:
-            await interaction.response.send_message(f"❌ Chyba: {str(e)[:100]}")
-        except:
-            pass
+        await interaction.response.send_message(f"❌ Chyba: {str(e)[:100]}")
 
 @bot.tree.command(name="diag", description="Diagnostika a info o botu")
 async def diag_command(interaction: discord.Interaction):
     """Show bot diagnostics."""
     await interaction.response.defer()
-    
     embed = discord.Embed(title="🩺 Diagnostika", color=discord.Color.green())
-    
-    # System info
     machine = platform.machine()
     is_rpi = _is_arm_system()
     embed.add_field(name="💻 Systém", value=f"Machine: {machine}\nARM: {'✅' if is_rpi else '❌'}", inline=True)
-    
-    # Audio
     ffmpeg_ok = "✅" if has_ffmpeg() else "❌"
     opus_ok = "✅" if HAS_OPUS else "❌"
     nacl_ok = "✅" if HAS_NACL else "❌"
     embed.add_field(name="🔊 Audio", value=f"FFmpeg: {ffmpeg_ok}\nOpus: {opus_ok}\nNaCl: {nacl_ok}", inline=True)
-    
-    # Voice clients
     voice_count = len(bot.voice_clients)
     embed.add_field(name="🎤 Voice", value=f"Connected: {voice_count}", inline=True)
-    
-    # Uptime
     if bot.user:
-        embed.add_field(name="⏱️ Verze", value="v2.1.0\nSlash Commands Era", inline=True)
-    
+        embed.add_field(name="⏱️ Verze", value="v2.1.2\nSlash Commands Era", inline=True)
     await interaction.followup.send(embed=embed)
 
-# ===== SCHEDULED TASKS =====
+# ═══════════════════════════════════════════════════════════════════════════════
+#                13. SCHEDULED TASKS – AUTOMATICKÉ ZPRÁVY
+# ═══════════════════════════════════════════════════════════════════════════════
 
 @tasks.loop(hours=24)
 async def send_morning_message():
-    """Send morning message at 09:00 CET."""
+    """Odeslat ranní zprávu v 09:00 CET."""
     now = datetime.datetime.now(pytz.timezone("Europe/Prague"))
     if now.hour == 9 and now.minute < 1:
         for guild in bot.guilds:
@@ -918,7 +901,7 @@ async def send_morning_message():
 
 @tasks.loop(hours=24)
 async def send_night_message():
-    """Send night message at 22:00 CET."""
+    """Odeslat noční zprávu v 22:00 CET."""
     now = datetime.datetime.now(pytz.timezone("Europe/Prague"))
     if now.hour == 22 and now.minute < 1:
         for guild in bot.guilds:
@@ -932,7 +915,7 @@ async def send_night_message():
 
 @tasks.loop(hours=24)
 async def send_free_games():
-    """Send free games at 20:10 CET."""
+    """Odeslat zdarma hry v 20:10 CET."""
     now = datetime.datetime.now(pytz.timezone("Europe/Prague"))
     if now.hour == 20 and 10 <= now.minute < 11:
         for guild in bot.guilds:
@@ -945,7 +928,6 @@ async def send_free_games():
                     for elem in data.get("data", {}).get("Catalog", {}).get("searchStore", {}).get("elements", [])[:5]:
                         if elem.get("promotions", {}).get("promotionalOffers"):
                             games.append(elem.get("title", "Unknown"))
-                    
                     if games:
                         desc = "\n".join(f"• {g}" for g in games)
                         embed = discord.Embed(title="🎁 Zdarma hry – Epic Games", description=desc, color=discord.Color.purple())
@@ -955,7 +937,7 @@ async def send_free_games():
 
 @tasks.loop(minutes=5)
 async def voice_watchdog():
-    """Monitor voice connections."""
+    """Monitoruj voice connections."""
     for guild_id, vc in list((vc.guild.id, vc) for vc in bot.voice_clients):
         if not vc.is_connected():
             _queue_for(guild_id).clear()
@@ -963,7 +945,7 @@ async def voice_watchdog():
 
 @tasks.loop(hours=1)
 async def clear_recent_announcements():
-    """Clear old announcements every hour."""
+    """Vyčisti staré oznámení každou hodinu."""
     global recently_announced_games
     recently_announced_games.clear()
 
@@ -983,38 +965,40 @@ async def before_free_games():
 async def before_watchdog():
     await bot.wait_until_ready()
 
-# ===== GAME PRESENCE TRACKING =====
+# ═══════════════════════════════════════════════════════════════════════════════
+#                15. GAME PRESENCE TRACKING – AUTOMATICKÉ BLESSINGS
+# ═══════════════════════════════════════════════════════════════════════════════
 
 @bot.event
 async def on_presence_update(before, after):
-    """Track when user starts/stops playing a game and send blessing."""
+    """Detekuj, kdy uživatel začne/skončí hrát hru a odeslij požehnání."""
     def is_game_activity(activity):
         return activity.type == discord.ActivityType.playing
 
-    # Skip if no guild or user is bot
+    # Přeskoč guild nebo bot users
     if not after.guild or after.bot:
         return
 
     before_game = next((a for a in before.activities if is_game_activity(a)), None)
     after_game = next((a for a in after.activities if is_game_activity(a)), None)
 
-    # Game started (was not playing, now is playing)
+    # Hra začala
     if before_game is None and after_game is not None:
         game_name = after_game.name
         print(f"[presence] {after.name} started playing: {game_name}")
         
-        # Get blessing message
+        # Vyber blessing
         if game_name in game_blessings:
             blessing = game_blessings[game_name]
         else:
-            # Fallback to generic blessing
+            # Fallback na náhodný generický blessing
             blessing = random.choice([
                 "Bůh tě provede hraním a dej to všechno!",
                 "Zábava s vírou – ať ti to jde!",
                 "Vychutnej si hru a bůh tě chrání!",
             ])
         
-        # Find channel and send blessing
+        # Najdi kanál a odeslij blessing
         channel = discord.utils.get(after.guild.text_channels, name="požehnání🙏")
         if channel and channel.permissions_for(after.guild.me).send_messages:
             msg = f"{after.name} právě hraje **{game_name}**. {blessing}"
@@ -1028,11 +1012,13 @@ async def on_presence_update(before, after):
         else:
             print(f"[presence] Channel 'požehnání🙏' not found or no permissions")
     
-    # Game stopped
+    # Hra skončila
     elif before_game is not None and after_game is None:
         print(f"[presence] {after.name} stopped playing: {before_game.name}")
 
-# ===== MAIN =====
+# ═══════════════════════════════════════════════════════════════════════════════
+#                      16. MAIN ENTRY POINT
+# ═══════════════════════════════════════════════════════════════════════════════
 
 if __name__ == "__main__":
     try:

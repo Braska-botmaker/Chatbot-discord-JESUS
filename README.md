@@ -1,6 +1,6 @@
 # ✝️ Ježíš Discord Bot – hudba, verše a hry zdarma 🙏
 
-**Verze:** v2.1.0 – Slash Commands Era | **Stav:** ✅ Plně funkční | **Platform:** Raspberry Pi Ready
+**Verze:** v2.1.2 – Slash Commands Era | **Platform:** Raspberry Pi Ready
 
 Discord bot napsaný v Pythonu (discord.py), který umí:
 
@@ -47,7 +47,7 @@ Po přihlášení bota vidíte `/` v Discord chatu. Veškeré příkazy jsou **s
 /komandy – Kompletní seznam
 ```
 
-**Žádné prefix commands!** V2.1.0 používá pouze `/` (app_commands) pro modernost a bezpečnost.
+**Žádné prefix commands!** V2.1.2 používá pouze `/` (app_commands) pro modernost a bezpečnost.
 
 * **Python 3.10+**
 * **FFmpeg** (pro přehrávání do voice)
@@ -169,7 +169,7 @@ Voice práva v cílovém kanálu:
 
 ---
 
-## ⌨️ Příkazy (Slash Commands – v2.1.0)
+## ⌨️ Příkazy (Slash Commands – v2.1.2)
 
 Hezký přehled najdete v `/komandy`. Základ:
 
@@ -275,21 +275,20 @@ python3 tools/rpi_voice_diagnostics.py
 /diag
 ```
 
-### ⚡ NOVÁ OPRAVA (v2.1.0) – Slash Commands + Robustní Error Handling
+### ⚡ NOVÁ OPRAVA (v2.1.2) – Persistent Storage + Outlast Blessings
 
-**Co se změnilo oproti v2.0.5e:**
-* ✅ **Slash Commands (`/`) místo Prefix Commands (`!`)** – moderní, bezpečnější, autocomplete
-* ✅ **České názvy příkazů** – `/yt`, `/další`, `/pauza` namísto `/play`, `/skip`, `/pause`
-* ✅ **Robustní error handling** – všechny commands mají try-except wrappery (39 bloků)
-* ✅ **Deferred responses** – dlouhé operace (audio, network) se netimeout-ují
-* ✅ **RPi Voice patches** – Error 4006 retry logic s exponential backoff
-* ✅ **Lepší diagnostika** – `/diag` ukazuje systém, audio status, voice connections
+**Co se změnilo oproti v2.1.0:**
+* ✅ **Persistent Storage (Verse Streak)** – `/verse` streak se nyní uchovává v `bot_data.json` a přežije restart
+* ✅ **Automatické načítání streaku** – bot načte streak při startu z `bot_data.json`
+* ✅ **Nová hra – Outlast série** – přidány 3 hry s českými požehnáními
+* ✅ **Robustní date handling** – streak data se správně serializují/deserializují (ISO format)
+* ✅ **Lepší organizace kódu** – přepracovaný bot.py s 16 jasně označenými sekcemi
 
 **Proč upgrade?**
-- Slash commands jsou stabilnější a budoucnější
-- Bezpečnější (žádné message prefix exploity)
-- Přehlednější pro uživatele (autocomplete pomůcka)
-- Lepší error handling = méně crashes
+- Verse streak teď přežije restart bota
+- Uživatelé si čuvají svůj streak i po restartu
+- Nová hra na zkušenou (Outlast)
+- Lepší čitelnost a údržba kódu
 
 ---
 
@@ -330,7 +329,7 @@ python3 tools/rpi_voice_diagnostics.py
 
 ---
 
-## 🎧 Poznámky k Slash Commands (v2.1.0)
+## 🎧 Poznámky k Slash Commands (v2.1.2)
 
 ### Jak používat?
 
@@ -376,7 +375,7 @@ python3 tools/rpi_voice_diagnostics.py
 
 ## 🛣️ Roadmapa – Ježíš Discord Bot (v2.x → v3.x)
 
-### 🟩 v2.1.0 (AKTUÁLNÍ VERZE – Slash Commands Era)
+### 🟩 v2.1.2 (AKTUÁLNÍ VERZE – Slash Commands Era + Persistent Storage)
 
 Nyní aktivní! Kompletní přepis na slash commands:
 * ✅ `/yt`, `/další`, `/pauza`, `/pokračuj`, `/zastav`, `/odejdi` – hudba s českými názvy
