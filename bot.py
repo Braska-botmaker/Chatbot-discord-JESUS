@@ -1,5 +1,5 @@
 # ╔════════════════════════════════════════════════════════════════════════════╗
-# ║           Ježíš Discord Bot v2.1.5 – Slash Commands Era                    ║
+# ║           Ježíš Discord Bot v2.2 – Minihry & Interakce                      ║
 # ║                     Kompletní přepis na slash commands                      ║
 # ║                  s Czech názvy pro maximální unikalitu                      ║
 # ╚════════════════════════════════════════════════════════════════════════════╝
@@ -966,12 +966,14 @@ async def verze_command(interaction: discord.Interaction):
     """Show bot version and changelog."""
     try:
         embed = discord.Embed(title="ℹ️ Ježíš Discord Bot", color=discord.Color.gold())
-        embed.add_field(name="Verze", value="v2.1.5 – Slash Commands Era", inline=False)
+        embed.add_field(name="Verze", value="v2.2 – Minihry & Interakce", inline=False)
         embed.add_field(name="Co je nového", value="""
 ✅ Kompletní přepis na slash commands
 ✅ Czech názvy pro unikalitu
 ✅ Game presence tracking se speciálními blessings
 ✅ Daily verse streak s milestones
+✅ Hry zdarma: Embed + Discord link previews
+✅ **Nové v2.2**: Minihry & XP systém (kviz, versfight, rollblessing)
 ❌ Žádné @ mention u automatických zpráv
 """, inline=False)
         embed.add_field(name="GitHub", value="https://github.com/Braska-botmaker/Chatbot-discord-JESUS", inline=False)
@@ -983,7 +985,7 @@ async def verze_command(interaction: discord.Interaction):
 async def komandy_command(interaction: discord.Interaction):
     """Show all available commands."""
     try:
-        embed = discord.Embed(title="📋 Příkazy – Ježíš Discord Bot v2.1.5", color=discord.Color.blue())
+        embed = discord.Embed(title="📋 Příkazy – Ježíš Discord Bot v2.2", color=discord.Color.blue())
         embed.add_field(name="🎵 Hudba", value="""
 /yt <url> – Přehrávej z YouTube
 /další – Přeskoč
@@ -1002,6 +1004,12 @@ async def komandy_command(interaction: discord.Interaction):
 /bless [@user] – Požehnání
 /diag – Diagnostika
 /komandy – Tohle
+""", inline=False)
+        embed.add_field(name="🎮 Minihry (v2.2)", value="""
+/biblickykviz – Biblický trivia
+/versfight @user – Veršový duel
+/rollblessing – RNG požehnání
+/profile [@user] – Tvůj profil + XP
 """, inline=False)
         await interaction.response.send_message(embed=embed)
     except Exception as e:
@@ -1022,7 +1030,7 @@ async def diag_command(interaction: discord.Interaction):
     voice_count = len(bot.voice_clients)
     embed.add_field(name="🎤 Voice", value=f"Connected: {voice_count}", inline=True)
     if bot.user:
-        embed.add_field(name="⏱️ Verze", value="v2.1.5\nSlash Commands Era", inline=True)
+        embed.add_field(name="⏱️ Verze", value="v2.2\nMinihry & Interakce", inline=True)
     await interaction.followup.send(embed=embed)
 
 # ═══════════════════════════════════════════════════════════════════════════════
@@ -1183,6 +1191,317 @@ async def on_presence_update(before, after):
     # Hra skončila
     elif before_game is not None and after_game is None:
         print(f"[presence] {after.name} stopped playing: {before_game.name}")
+
+# ═══════════════════════════════════════════════════════════════════════════════
+#                    15. MINIHRY & INTERAKCE (v2.2)
+# ═══════════════════════════════════════════════════════════════════════════════
+
+# XP tracking a role progression
+user_xp = {}  # {user_id: {"xp": int, "level": str}}
+xp_multiplier = 10  # 10 XP per win
+biblical_quiz_questions = [
+    {
+        "question": "Kolik je všech 66 knih Bible?",
+        "options": ["60", "66", "72", "50"],
+        "correct": 1
+    },
+    {
+        "question": "Kdo je autorem nejvíce psalmů?",
+        "options": ["Mojžíš", "Davidský", "Salomon", "Ježíš"],
+        "correct": 1
+    },
+    {
+        "question": "Jaký je název první knihy Bible?",
+        "options": ["Exodus", "Genesis", "Leviticus", "Čísla"],
+        "correct": 1
+    },
+    {
+        "question": "Jak se jmenoval Kristův učitel během dospělosti?",
+        "options": ["Jan", "Petr", "Ježíš", "Jan Křtitel"],
+        "correct": 3
+    },
+    {
+        "question": "Kolik apostolů měl Ježíš?",
+        "options": ["10", "11", "12", "13"],
+        "correct": 2
+    },
+    {
+        "question": "V kterém městě se Ježíš narodil?",
+        "options": ["Jeruzalém", "Nazaret", "Betlém", "Jericho"],
+        "correct": 2
+    },
+    {
+        "question": "Jaké bylo jméno muže, který trpěl 38 let?",
+        "options": ["Zákchej", "Neznámý", "Paralyzovaný", "Sleператор"],
+        "correct": 2
+    },
+    {
+        "question": "Kolik dní Ježíš postil v poušti?",
+        "options": ["30", "40", "50", "7"],
+        "correct": 1
+    },
+    {
+        "question": "Jaké je jméno největšího apoštola?",
+        "options": ["Matouš", "Petr", "Jakub", "Jan"],
+        "correct": 1
+    },
+    {
+        "question": "Co dělal Zákchej dříve?",
+        "options": ["Rybář", "Celtář", "Horář", "Lékař"],
+        "correct": 1
+    }
+]
+
+def get_user_level(xp: int) -> str:
+    """Vrátí level na základě XP."""
+    if xp < 100:
+        return "🔰 Učedník"
+    elif xp < 300:
+        return "📜 Prorok"
+    else:
+        return "👑 Apoštol"
+
+@bot.tree.command(name="biblickykviz", description="Biblický trivia kviz – 10 otázek")
+async def biblickykviz_command(interaction: discord.Interaction):
+    """Biblický trivia kviz s interaktivními buttony."""
+    user_id = interaction.user.id
+    
+    # Inicializuj XP
+    if user_id not in user_xp:
+        user_xp[user_id] = {"xp": 0, "level": "🔰 Učedník"}
+    
+    score = 0
+    questions_used = random.sample(biblical_quiz_questions, min(10, len(biblical_quiz_questions)))
+    
+    await interaction.response.defer()
+    
+    for i, q in enumerate(questions_used, 1):
+        # Vytvoř buttony pro odpovědi
+        class QuizView(discord.ui.View):
+            def __init__(self, q_data):
+                super().__init__(timeout=30)
+                self.q_data = q_data
+                self.answered = False
+                self.correct = False
+                
+                for idx, option in enumerate(q_data["options"]):
+                    button = discord.ui.Button(
+                        label=option,
+                        style=discord.ButtonStyle.blurple,
+                        custom_id=f"q_{idx}"
+                    )
+                    button.callback = self.button_callback
+                    self.add_item(button)
+            
+            async def button_callback(self, button_interaction: discord.Interaction):
+                if button_interaction.user.id != user_id:
+                    await button_interaction.response.send_message(
+                        "❌ Toto není tvůj kviz!",
+                        ephemeral=True
+                    )
+                    return
+                
+                if self.answered:
+                    await button_interaction.response.send_message(
+                        "Už jsi odpověděl na tuto otázku!",
+                        ephemeral=True
+                    )
+                    return
+                
+                # Určuj správnost
+                answer_idx = int(button_interaction.data["custom_id"].split("_")[1])
+                self.correct = (answer_idx == self.q_data["correct"])
+                self.answered = True
+                
+                # Zobraz výsledek
+                if self.correct:
+                    await button_interaction.response.send_message(
+                        f"✅ Správně! '{self.q_data['options'][self.q_data['correct']]}'",
+                        ephemeral=True
+                    )
+                else:
+                    await button_interaction.response.send_message(
+                        f"❌ Špatně! Správná odpověď: '{self.q_data['options'][self.q_data['correct']]}'",
+                        ephemeral=True
+                    )
+                
+                self.stop()
+        
+        # Pošli otázku
+        options_text = "\n".join([f"{j+1}️⃣ {opt}" for j, opt in enumerate(q["options"])])
+        question_embed = discord.Embed(
+            title=f"Otázka {i}/10",
+            description=f"**{q['question']}**\n\n{options_text}",
+            color=discord.Color.blue()
+        )
+        
+        view = QuizView(q)
+        await interaction.followup.send(embed=question_embed, view=view)
+        
+        # Čekej na odpověď
+        await view.wait()
+        
+        if view.correct:
+            score += 1
+        
+        # Krátkých pauza mezi otázkami
+        await asyncio.sleep(0.5)
+    
+    # Uprav XP
+    xp_gain = score * xp_multiplier
+    user_xp[user_id]["xp"] += xp_gain
+    user_xp[user_id]["level"] = get_user_level(user_xp[user_id]["xp"])
+    
+    result_embed = discord.Embed(
+        title="🎉 Výsledky Kvizu",
+        description=f"**Skóre:** {score}/10\n**XP:** +{xp_gain}\n**Celkem XP:** {user_xp[user_id]['xp']}\n**Level:** {user_xp[user_id]['level']}",
+        color=discord.Color.green() if score >= 7 else discord.Color.orange()
+    )
+    await interaction.followup.send(embed=result_embed)
+
+@bot.tree.command(name="versfight", description="Veršový duel s dalším hráčem")
+async def versfight_command(interaction: discord.Interaction, opponent: discord.User):
+    """Veršový duel – náhodné verše, hlasování."""
+    await interaction.response.defer()
+    
+    if opponent.bot:
+        await interaction.followup.send("❌ Nemůžeš se duellovat s botem!")
+        return
+    
+    user_id = interaction.user.id
+    opponent_id = opponent.id
+    
+    if user_id not in user_xp:
+        user_xp[user_id] = {"xp": 0, "level": "🔰 Učedník"}
+    if opponent_id not in user_xp:
+        user_xp[opponent_id] = {"xp": 0, "level": "🔰 Učedník"}
+    
+    # Vyber náhodné verše
+    verse1 = random.choice(verses)
+    verse2 = random.choice(verses)
+    
+    embed = discord.Embed(
+        title="⚔️ Veršový Duel",
+        description=f"{interaction.user.mention} vs {opponent.mention}",
+        color=discord.Color.red()
+    )
+    embed.add_field(name=f"🔴 {interaction.user.name}", value=verse1, inline=False)
+    embed.add_field(name=f"🔵 {opponent.name}", value=verse2, inline=False)
+    
+    msg = await interaction.followup.send(embed=embed)
+    
+    # Přidej emojis pro hlasování
+    await msg.add_reaction("🔴")
+    await msg.add_reaction("🔵")
+    
+    await asyncio.sleep(15)  # 15 sekund na hlasování
+    
+    # Spočítej hlasy
+    try:
+        msg = await interaction.channel.fetch_message(msg.id)
+        red_votes = next((r.count for r in msg.reactions if r.emoji == "🔴"), 0) - 1
+        blue_votes = next((r.count for r in msg.reactions if r.emoji == "🔵"), 0) - 1
+        
+        winner = interaction.user if red_votes > blue_votes else opponent if blue_votes > red_votes else None
+        
+        if winner:
+            xp_gain = 50
+            user_xp[winner.id]["xp"] += xp_gain
+            user_xp[winner.id]["level"] = get_user_level(user_xp[winner.id]["xp"])
+            
+            result = discord.Embed(
+                title="🏆 Vítěz!",
+                description=f"{winner.mention} vítězí!\n\n**Hlasy:** 🔴{red_votes} vs 🔵{blue_votes}\n**XP:** +{xp_gain}",
+                color=discord.Color.gold()
+            )
+        else:
+            result = discord.Embed(
+                title="🤝 Remíza!",
+                description=f"Obě strany byly stejně dobré!\n\n**Hlasy:** 🔴{red_votes} vs 🔵{blue_votes}",
+                color=discord.Color.blue()
+            )
+        
+        await interaction.followup.send(embed=result)
+    except Exception as e:
+        await interaction.followup.send(f"❌ Chyba při počítání hlasů: {str(e)[:80]}")
+
+# Cooldown tracking pro rollblessing
+rollblessing_cooldown = {}
+
+@bot.tree.command(name="rollblessing", description="RNG požehnání s cooldown 1h")
+async def rollblessing_command(interaction: discord.Interaction):
+    """Náhodné RNG požehnání s cooldown."""
+    user_id = interaction.user.id
+    now = datetime.datetime.now()
+    
+    # Zkontroluj cooldown
+    if user_id in rollblessing_cooldown:
+        last_used = rollblessing_cooldown[user_id]
+        cooldown_time = last_used + datetime.timedelta(hours=1)
+        if now < cooldown_time:
+            remaining = cooldown_time - now
+            minutes = remaining.total_seconds() / 60
+            await interaction.response.send_message(f"⏳ Počkej ještě **{int(minutes)} minut** na další roll!")
+            return
+    
+    # Generuj náhodné požehnání
+    all_blessings = list(game_blessings.values()) + [
+        "🙏 Bůh tě vidí a vidí tvou věrnost!",
+        "✨ Tvá duše je jako hvězda na nebi – bez ceny!",
+        "💫 Ať tě Bůh provede každým krokem!",
+        "🌟 Nic není nemožné, když věříš!",
+        "🔥 Buď silný v Kristu a zvítězíš!",
+        "📿 Modlitba je nejsilnější zbraň!",
+        "⛪ Sláva Bohu za jeho milost!",
+        "👼 Andělé tě střeží v každém momentu!",
+    ]
+    
+    blessing = random.choice(all_blessings)
+    
+    # Ulož cooldown
+    rollblessing_cooldown[user_id] = now
+    
+    embed = discord.Embed(
+        title="🎲 RNG Požehnání",
+        description=f"{interaction.user.mention}\n\n{blessing}",
+        color=discord.Color.purple()
+    )
+    await interaction.response.send_message(embed=embed)
+
+@bot.tree.command(name="profile", description="Zobraz svůj profil s XP a levelem")
+async def profile_command(interaction: discord.Interaction, user: discord.User = None):
+    """Zobraz profil hráče s XP a levelem."""
+    target = user or interaction.user
+    user_id = target.id
+    
+    if user_id not in user_xp:
+        user_xp[user_id] = {"xp": 0, "level": "🔰 Učedník"}
+    
+    xp_data = user_xp[user_id]
+    xp = xp_data["xp"]
+    level = xp_data["level"]
+    
+    # Kalkuluj progress k dalšímu levelu
+    if xp < 100:
+        next_milestone = 100
+    elif xp < 300:
+        next_milestone = 300
+    else:
+        next_milestone = xp + 100  # Další milník
+    
+    progress = ((xp % (next_milestone // 2)) / (next_milestone // 2)) * 100
+    progress_bar = "█" * int(progress // 10) + "░" * (10 - int(progress // 10))
+    
+    embed = discord.Embed(
+        title=f"👤 Profil – {target.name}",
+        color=discord.Color.gold()
+    )
+    embed.add_field(name="🏅 Level", value=level, inline=True)
+    embed.add_field(name="⭐ XP", value=f"{xp}", inline=True)
+    embed.add_field(name="📊 Progres", value=f"{progress_bar} {int(progress)}%", inline=False)
+    embed.set_thumbnail(url=target.avatar.url if target.avatar else None)
+    
+    await interaction.response.send_message(embed=embed)
 
 # ═══════════════════════════════════════════════════════════════════════════════
 #                      16. MAIN ENTRY POINT
