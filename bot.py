@@ -1,5 +1,5 @@
 # ╔════════════════════════════════════════════════════════════════════════════╗
-# ║           Ježíš Discord Bot v2.1.4 – Slash Commands Era                    ║
+# ║           Ježíš Discord Bot v2.1.5 – Slash Commands Era                    ║
 # ║                     Kompletní přepis na slash commands                      ║
 # ║                  s Czech názvy pro maximální unikalitu                      ║
 # ╚════════════════════════════════════════════════════════════════════════════╝
@@ -25,6 +25,9 @@ import time
 import json
 import pathlib
 import platform
+import re
+from html import unescape as html_unescape
+import xml.etree.ElementTree as ET
 
 _yt_dlp = None
 
@@ -394,6 +397,98 @@ async def play_next(guild: discord.Guild, text_channel: discord.TextChannel):
 # ═══════════════════════════════════════════════════════════════════════════════
 #                   7. VERSE STREAK TRACKING DATA
 # ═══════════════════════════════════════════════════════════════════════════════
+
+def get_free_games():
+    """Sbírá zdarma hry z více zdrojů: Epic, Steam (free na 0), PlayStation Blog.
+    
+    Vrací seznam dict s 'title' a 'url'. Deduplikuje podle (title, url).
+    """
+    games = []
+    seen = set()
+
+    # ═══ EPIC GAMES ═══
+    try:
+        epic_api = "https://store-site-backend-static.ak.epicgames.com/freeGamesPromotions"
+        response = requests.get(epic_api, timeout=5)
+        data = response.json()
+        
+        if isinstance(data, dict):
+            data_section = data.get("data")
+            if isinstance(data_section, dict):
+                catalog = data_section.get("Catalog")
+                if isinstance(catalog, dict):
+                    search_store = catalog.get("searchStore")
+                    if isinstance(search_store, dict):
+                        elements = search_store.get("elements", [])
+                        if isinstance(elements, list):
+                            for game in elements:
+                                if not isinstance(game, dict):
+                                    continue
+                                try:
+                                    if game.get("price", {}).get("totalPrice", {}).get("discountPrice") == 0:
+                                        title = game.get("title", "Unknown").strip()
+                                        mappings = game.get("catalogNs", {}).get("mappings", [])
+                                        if mappings and isinstance(mappings, list) and len(mappings) > 0:
+                                            slug = mappings[0].get("pageSlug", "")
+                                            if slug:
+                                                url = f"https://store.epicgames.com/p/{slug}"
+                                                key = (title, url)
+                                                if key not in seen:
+                                                    seen.add(key)
+                                                    games.append({"title": title, "url": url})
+                                except Exception:
+                                    continue
+    except Exception as e:
+        print(f"[freegames] Epic error: {e}")
+
+    # ═══ STEAM ═══
+    try:
+        # Steam special discounts na 0 - hledáme hry slevněné z nějaké ceny na 0
+        steam_url = "https://store.steampowered.com/search/?maxprice=0&specials=1"
+        r = requests.get(steam_url, timeout=6, headers={"User-Agent": "Mozilla/5.0"})
+        html = r.text
+        
+        # Hledej search_result_row s titulem a URL
+        pattern = re.compile(
+            r'<a[^>]+class="search_result_row[^"]*"[^>]+href="(?P<href>[^"]+)"[^>]*>.*?<span class="title">(?P<title>.*?)</span>',
+            re.DOTALL
+        )
+        count = 0
+        for m in pattern.finditer(html):
+            title = re.sub(r"\s+", " ", m.group('title')).strip()
+            title = html_unescape(title)
+            href = m.group('href').split('?')[0]
+            key = (title, href)
+            if key not in seen and count < 12:
+                seen.add(key)
+                games.append({"title": title, "url": href})
+                count += 1
+    except Exception as e:
+        print(f"[freegames] Steam error: {e}")
+
+    # ═══ PLAYSTATION PLUS ═══
+    try:
+        ps_feed = "https://blog.playstation.com/tag/playstation-plus/feed/"
+        r = requests.get(ps_feed, timeout=6, headers={"User-Agent": "Mozilla/5.0"})
+        if r.status_code == 200:
+            try:
+                root = ET.fromstring(r.content)
+                items = root.findall('.//item')
+                for item in items[:6]:
+                    title_el = item.find('title')
+                    link_el = item.find('link')
+                    title = title_el.text if title_el is not None else 'PlayStation Plus announcement'
+                    link = link_el.text if link_el is not None else 'https://blog.playstation.com'
+                    key = (title, link)
+                    if key not in seen:
+                        seen.add(key)
+                        games.append({"title": title, "url": link})
+            except Exception as e:
+                print(f"[freegames] PlayStation parse error: {e}")
+    except Exception as e:
+        print(f"[freegames] PlayStation error: {e}")
+
+    return games
 
 verse_streak = {}  # {user_id: {"count": int, "last_date": date}}
 streak_messages = {
@@ -814,25 +909,39 @@ async def verse_command(interaction: discord.Interaction):
     except Exception as e:
         await interaction.response.send_message(f"❌ Chyba: {str(e)[:100]}")
 
-@bot.tree.command(name="freegames", description="Hry zdarma – Epic Games")
+@bot.tree.command(name="freegames", description="Hry zdarma – Epic Games, Steam, PlayStation")
 async def freegames_command(interaction: discord.Interaction):
-    """Show free games from Epic Games Store."""
+    """Show free games from Epic Games Store, Steam, and PlayStation."""
     await interaction.response.defer()
     try:
-        response = requests.get("https://store-site-backend-static.ak.epicgames.com/freeGamesPromotions", timeout=10)
-        data = response.json()
-        games = []
-        for elem in data.get("data", {}).get("Catalog", {}).get("searchStore", {}).get("elements", [])[:5]:
-            if elem.get("promotions", {}).get("promotionalOffers"):
-                games.append(elem.get("title", "Unknown"))
-        if games:
-            desc = "\n".join(f"• {g}" for g in games)
-            embed = discord.Embed(title="🎁 Epic Games – Zdarma", description=desc, color=discord.Color.purple())
-            await interaction.followup.send(embed=embed)
-        else:
-            await interaction.followup.send("❌ Žádné hry zdarma v Epic Games Store")
+        free_games = get_free_games()
+        if not free_games:
+            await interaction.followup.send("❌ Momentálně nejsou k dispozici žádné hry zdarma.")
+            return
+        
+        # Vytvoř strukturovaný text s odkazy
+        description_lines = []
+        urls_for_previews = []
+        for i, game in enumerate(free_games[:15], 1):
+            description_lines.append(f"{i}. [{game['title']}]({game['url']})")
+            urls_for_previews.append(game['url'])
+        
+        description = "\n".join(description_lines)
+        
+        # Vytvoř embed
+        embed = discord.Embed(title="🎁 Hry Zdarma", description=description, color=discord.Color.purple())
+        embed.set_footer(text="Hry se mění měsíčně. Náhledy se načítají pod embedem...")
+        
+        # Pošli embed
+        await interaction.followup.send(embed=embed)
+        
+        # Pošli bare URLs pro Discord link previews
+        if urls_for_previews:
+            urls_message = "\n".join(urls_for_previews)
+            await interaction.followup.send(urls_message)
     except Exception as e:
-        await interaction.followup.send(f"❌ Chyba: {str(e)[:100]}")
+        print(f"[freegames] Error: {type(e).__name__}: {e}")
+        await interaction.followup.send(f"❌ Chyba při načítání her: {str(e)[:80]}")
 
 @bot.tree.command(name="bless", description="Požehnání pro uživatele")
 async def bless_command(interaction: discord.Interaction, user: discord.User = None):
@@ -857,7 +966,7 @@ async def verze_command(interaction: discord.Interaction):
     """Show bot version and changelog."""
     try:
         embed = discord.Embed(title="ℹ️ Ježíš Discord Bot", color=discord.Color.gold())
-        embed.add_field(name="Verze", value="v2.1.4 – Slash Commands Era", inline=False)
+        embed.add_field(name="Verze", value="v2.1.5 – Slash Commands Era", inline=False)
         embed.add_field(name="Co je nového", value="""
 ✅ Kompletní přepis na slash commands
 ✅ Czech názvy pro unikalitu
@@ -874,7 +983,7 @@ async def verze_command(interaction: discord.Interaction):
 async def komandy_command(interaction: discord.Interaction):
     """Show all available commands."""
     try:
-        embed = discord.Embed(title="📋 Příkazy – Ježíš Discord Bot v2.1.4", color=discord.Color.blue())
+        embed = discord.Embed(title="📋 Příkazy – Ježíš Discord Bot v2.1.5", color=discord.Color.blue())
         embed.add_field(name="🎵 Hudba", value="""
 /yt <url> – Přehrávej z YouTube
 /další – Přeskoč
@@ -913,18 +1022,18 @@ async def diag_command(interaction: discord.Interaction):
     voice_count = len(bot.voice_clients)
     embed.add_field(name="🎤 Voice", value=f"Connected: {voice_count}", inline=True)
     if bot.user:
-        embed.add_field(name="⏱️ Verze", value="v2.1.4\nSlash Commands Era", inline=True)
+        embed.add_field(name="⏱️ Verze", value="v2.1.5\nSlash Commands Era", inline=True)
     await interaction.followup.send(embed=embed)
 
 # ═══════════════════════════════════════════════════════════════════════════════
 #                13. SCHEDULED TASKS – AUTOMATICKÉ ZPRÁVY
 # ═══════════════════════════════════════════════════════════════════════════════
 
-@tasks.loop(hours=24)
+@tasks.loop(minutes=1)
 async def send_morning_message():
     """Odeslat ranní zprávu v 09:00 CET."""
     now = datetime.datetime.now(pytz.timezone("Europe/Prague"))
-    if now.hour == 9 and now.minute < 1:
+    if now.hour == 9 and now.minute == 0:
         for guild in bot.guilds:
             channel = discord.utils.get(guild.text_channels, name="požehnání🙏")
             if channel:
@@ -933,44 +1042,62 @@ async def send_morning_message():
                 embed.add_field(name="📖 Dnešní verš", value=verse, inline=False)
                 try:
                     await channel.send(embed=embed)
-                except:
-                    pass
+                    print(f"[morning] Sent to {guild.name}")
+                except Exception as e:
+                    print(f"[morning] Error in {guild.name}: {e}")
 
-@tasks.loop(hours=24)
+@tasks.loop(minutes=1)
 async def send_night_message():
     """Odeslat noční zprávu v 22:00 CET."""
     now = datetime.datetime.now(pytz.timezone("Europe/Prague"))
-    if now.hour == 22 and now.minute < 1:
+    if now.hour == 22 and now.minute == 0:
         for guild in bot.guilds:
             channel = discord.utils.get(guild.text_channels, name="požehnání🙏")
             if channel:
                 embed = discord.Embed(title="🌙 Dobrou noc!", description="Spi v pokoji Kristově. Zítřka tě čeká nový den plný příležitostí.", color=discord.Color.dark_blue())
                 try:
                     await channel.send(embed=embed)
-                except:
-                    pass
+                    print(f"[night] Sent to {guild.name}")
+                except Exception as e:
+                    print(f"[night] Error in {guild.name}: {e}")
 
-@tasks.loop(hours=24)
+@tasks.loop(minutes=1)
 async def send_free_games():
     """Odeslat zdarma hry v 20:10 CET."""
     now = datetime.datetime.now(pytz.timezone("Europe/Prague"))
-    if now.hour == 20 and 10 <= now.minute < 11:
+    if now.hour == 20 and now.minute == 10:
         for guild in bot.guilds:
             channel = discord.utils.get(guild.text_channels, name="hry_zdarma💵")
             if channel:
                 try:
-                    response = requests.get("https://store-site-backend-static.ak.epicgames.com/freeGamesPromotions", timeout=10)
-                    data = response.json()
-                    games = []
-                    for elem in data.get("data", {}).get("Catalog", {}).get("searchStore", {}).get("elements", [])[:5]:
-                        if elem.get("promotions", {}).get("promotionalOffers"):
-                            games.append(elem.get("title", "Unknown"))
-                    if games:
-                        desc = "\n".join(f"• {g}" for g in games)
-                        embed = discord.Embed(title="🎁 Zdarma hry – Epic Games", description=desc, color=discord.Color.purple())
-                        await channel.send(embed=embed)
-                except:
-                    pass
+                    free_games = get_free_games()
+                    if not free_games:
+                        continue
+                    
+                    # Vytvoř strukturovaný text s odkazy
+                    description_lines = []
+                    urls_for_previews = []
+                    for i, game in enumerate(free_games[:15], 1):
+                        description_lines.append(f"{i}. [{game['title']}]({game['url']})")
+                        urls_for_previews.append(game['url'])
+                    
+                    description = "\n".join(description_lines)
+                    
+                    # Vytvoř embed
+                    embed = discord.Embed(title="🎁 Hry Zdarma", description=description, color=discord.Color.purple())
+                    embed.set_footer(text="Hry se mění měsíčně.")
+                    
+                    # Pošli embed
+                    await channel.send(embed=embed)
+                    
+                    # Pošli bare URLs pro Discord link previews
+                    if urls_for_previews:
+                        urls_message = "\n".join(urls_for_previews)
+                        await channel.send(urls_message)
+                    
+                    print(f"[send_free_games] Sent to {guild.name}")
+                except Exception as e:
+                    print(f"[send_free_games] Error in {guild.name}: {e}")
 
 @tasks.loop(minutes=5)
 async def voice_watchdog():
@@ -1000,6 +1127,10 @@ async def before_free_games():
 
 @voice_watchdog.before_loop
 async def before_watchdog():
+    await bot.wait_until_ready()
+
+@clear_recent_announcements.before_loop
+async def before_clear():
     await bot.wait_until_ready()
 
 # ═══════════════════════════════════════════════════════════════════════════════

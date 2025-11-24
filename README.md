@@ -1,6 +1,6 @@
 # ✝️ Ježíš Discord Bot – hudba, verše a hry zdarma 🙏
 
-**Verze:** v2.1.4 – Slash Commands Era | **Platform:** Raspberry Pi Ready
+**Verze:** v2.1.5 – Slash Commands Era | **Platform:** Raspberry Pi Ready
 
 Discord bot napsaný v Pythonu (discord.py), který umí:
 
@@ -47,7 +47,7 @@ Po přihlášení bota vidíte `/` v Discord chatu. Veškeré příkazy jsou **s
 /komandy – Kompletní seznam
 ```
 
-**Žádné prefix commands!** V2.1.4 používá pouze `/` (app_commands) pro modernost a bezpečnost.
+**Žádné prefix commands!** V2.1.5 používá pouze `/` (app_commands) pro modernost a bezpečnost.
 
 * **Python 3.10+**
 * **FFmpeg** (pro přehrávání do voice)
@@ -169,7 +169,7 @@ Voice práva v cílovém kanálu:
 
 ---
 
-## ⌨️ Příkazy (Slash Commands – v2.1.4)
+## ⌨️ Příkazy (Slash Commands – v2.1.5)
 
 Hezký přehled najdete v `/komandy`. Základ:
 
@@ -275,18 +275,19 @@ python3 tools/rpi_voice_diagnostics.py
 /diag
 ```
 
-### ⚡ NOVÁ OPRAVA (v2.1.4) – Inactivity Disconnect
+### ⚡ NOVÁ OPRAVA (v2.1.5) – Scheduled Tasks + Epic Games Fix
 
-**Co se změnilo oproti v2.1.3:**
-* ✅ **Inactivity Timer** – bot se automaticky odpojí po 2 minutách neaktivity
-* ✅ **Sniží zatížení serveru** – bot nezûstává zbytečně v prázdných kanálech
-* ✅ **Smart Timer Reset** – timer se zruší, když se přidá nová skladba
-* ✅ **Uživatelská kontrola** – `Uživatel si jejího opuotĕní boť se nestačí odpojit`
+**Co se změnilo oproti v2.1.4:**
+* ✅ **Opravy Scheduled Tasks** – "Dobré ráno" a "Dobrou noc" nyní fungují
+* ✅ **Epic Games API Fix** – `/freegamesjo` (přeejmenováno) a automatické odeslání her
+* ✅ **Robust Error Handling** – komplexní parsování dat s fallbacky
+* ✅ **Debug Logging** – lépe vidít, co se děje v logů
+* ✅ **Precision Timing** – tasks běží každé minuty a kontrolují přesný čas
 
 **Proč upgrade?**
-- Bot nevytáčí prostředky na váženíš serverech
-- Sníží počet botů v prázdných kanálech
-- Vhodné zejména na RPi s omezeným výkonem
+- Automatické zprávy nyní funkčují spolehlivě
+- Epic Games API stávové chyby jsou vyřešeny
+- Lepší viditelnost do problémů přes logging
 
 ---
 
@@ -327,7 +328,7 @@ python3 tools/rpi_voice_diagnostics.py
 
 ---
 
-## 🎧 Poznámky k Slash Commands (v2.1.4)
+## 🎧 Poznámky k Slash Commands (v2.1.5)
 
 ### Jak používat?
 
@@ -373,7 +374,7 @@ python3 tools/rpi_voice_diagnostics.py
 
 ## 🛣️ Roadmapa – Ježíš Discord Bot (v2.x → v3.x)
 
-### 🟩 v2.1.4 (AKTUÁLNÍ VERZE – Slash Commands Era + Inactivity Management)
+### 🟩 v2.1.5 (AKTUÁLNÍ VERZE – Slash Commands Era + Task + API Fixes)
 
 Nyní aktivní! Kompletní přepis na slash commands:
 * ✅ `/yt`, `/další`, `/pauza`, `/pokračuj`, `/zastav`, `/odejdi` – hudba s českými názvy
