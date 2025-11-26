@@ -1,14 +1,14 @@
 # ✝️ Ježíš Discord Bot – hudba, verše a hry zdarma 🙏
 
-**Verze:** v2.2 – Minihry & Interakce | **Platform:** Raspberry Pi Ready
+**Verze:** v2.2.1 – Enhanced Queue Display | **Platform:** Raspberry Pi Ready
 
 Discord bot napsaný v Pythonu (discord.py), který umí:
 
-* 🎵 Přehrávat hudbu z URL (YouTube přes `yt-dlp`) do voice kanálu
+* 🎵 Přehrávat hudbu z URL (YouTube přes `yt-dlp`) do voice kanálu - s názvy skladeb
 * 📖 Posílat ranní a večerní zprávy s biblickým veršem
 * 🙏 Žehnat hráčům při spuštění her a reagovat na společné hraní ve voice
 * 🎁 Každý večer publikovat „Hry zdarma" s embedem a Discord link previews
-* 🎮 **Nové v2.2**: Minihry s XP systémem (kviz, veršový duel, RNG požehnání)
+* 🎮 Minihry s XP systémem (kviz, veršový duel, RNG požehnání)
 * ℹ️ Slash commands: `/komandy`, `/verze`, `/diag` s automatickým autocomplete
 
 > Optimalizováno pro běh na Raspberry Pi 24/7, ale funguje i lokálně na Windows/Linux/macOS.
@@ -170,7 +170,7 @@ Voice práva v cílovém kanálu:
 
 ---
 
-## ⌨️ Příkazy (Slash Commands – v2.2)
+## ⌨️ Příkazy (Slash Commands – v2.2.1)
 
 Hezký přehled najdete v `/komandy`. Základ:
 
@@ -382,23 +382,27 @@ python3 tools/rpi_voice_diagnostics.py
 
 ## 🛣️ Roadmapa – Ježíš Discord Bot (v2.x → v3.x)
 
-### 🟩 v2.2 (AKTUÁLNÍ VERZE – Minihry & Interakce)
+### 🟩 v2.2.1 (AKTUÁLNÍ VERZE – Enhanced Queue Display)
 
-Nyní aktivní! Rozšíření o minihry a XP systém:
-* ✅ `/biblickykviz` – biblický trivia s 10 otázkami a hodnocením
+Nyní aktivní! Vylepšená hudební fronta:
+* ✅ Všechny minihry z v2.2 (kviz, versfight, rollblessing, profile)
+* ✅ XP systém: 🔰 Učedník → 📜 Prorok → 👑 Apoštol
+* ✅ **Nové v2.2.1**: `/fronta` zobrazuje názvy skladeb + URL (strukturovaně)
+* ✅ Hudba s českými názvy (auto-extrakce názvu z YouTube)
+* ✅ Všechny minihry, hry zdarma, verse streak, presence tracking
+
+### 🟩 v2.2 (PŘEDCHOZÍ VERZE – Minihry & Interakce)
+
+Verze s minihrama:
+* ✅ `/biblickykviz` – biblický trivia s 10 otázkami a interaktivními buttony
 * ✅ `/versfight @user` – veršový duel se hlasováním
 * ✅ `/rollblessing` – RNG požehnání (cooldown 1h)
 * ✅ `/profile [@user]` – zobrazení XP a levelu (3 stupně)
-* ✅ **XP Systém**: 🔰 Učedník (0-99) → 📜 Prorok (100-299) → 👑 Apoštol (300+)
-* ✅ Lehké textové minihry, RPi-friendly
-* ✅ Veše z v2.1.5 (hudba, verše, hry zdarma, presence tracking)
+* ✅ XP Systém s automatickými levely
 
-### 🟩 v2.1.5 (PŘEDCHOZÍ VERZE – Enhanced Game Display)
+### 🟩 v2.1.5 (LEGACY VERZE – Enhanced Game Display)
 
-Předcházející verze:
-* ✅ `/yt`, `/další`, `/pauza`, `/pokračuj`, `/zastav`, `/odejdi` – hudba s českými názvy
-* ✅ `/np`, `/fronta`, `/vtest` – queue management
-* ✅ `/verse`, `/freegames`, `/bless` – ostatní
+Starší verze:
 * ✅ Embed + Discord link previews pro hry zdarma (Epic, Steam, PlayStation)
 * ✅ 24/7 scheduled tasks (ranní zprávy, noční zprávy, free games)
 * ✅ RPi voice patches (Error 4006 – exponential backoff)

@@ -1,5 +1,5 @@
 # ╔════════════════════════════════════════════════════════════════════════════╗
-# ║           Ježíš Discord Bot v2.2 – Minihry & Interakce                      ║
+# ║           Ježíš Discord Bot v2.2.1 – Enhanced Queue Display             ║
 # ║                     Kompletní přepis na slash commands                      ║
 # ║                  s Czech názvy pro maximální unikalitu                      ║
 # ╚════════════════════════════════════════════════════════════════════════════╝
@@ -375,7 +375,9 @@ async def play_next(guild: discord.Guild, text_channel: discord.TextChannel):
             options=get_ffmpeg_options()
         )
         
-        now_playing[guild.id] = extracted["title"]
+        # Použij uložený název ze song dictu, nebo fallback na extrahovaný
+        title = song.get("title", extracted["title"])
+        now_playing[guild.id] = title
         
         def after_play(error):
             if error:
@@ -386,7 +388,7 @@ async def play_next(guild: discord.Guild, text_channel: discord.TextChannel):
             )
         
         vc.play(source, after=after_play)
-        embed = discord.Embed(title="🎵 Přehrávám", description=extracted["title"], color=discord.Color.blue())
+        embed = discord.Embed(title="🎵 Přehrávám", description=title, color=discord.Color.blue())
         await text_channel.send(embed=embed)
         
     except Exception as e:
@@ -682,12 +684,21 @@ async def yt_command(interaction: discord.Interaction, url: str):
             await interaction.followup.send(f"❌ Nemohu se připojit k voice kanálu: {str(e)[:100]}")
             return
     
-    _queue_for(guild.id).append({"url": url})
+    # Extrahuj název z URL pomocí yt-dlp
+    try:
+        title = "Načítám..."
+        extracted = ytdlp_extract(url)
+        title = extracted.get("title", "Neznámá skladba")
+    except Exception as e:
+        title = "Chyba při načítání názvu"
+        print(f"[yt] Error extracting title: {e}")
+    
+    _queue_for(guild.id).append({"url": url, "title": title})
     if not vc.is_playing():
         await play_next(guild, interaction.channel)
-        await interaction.followup.send(f"▶️ Začínám přehrávat: {url}")
+        await interaction.followup.send(f"▶️ Začínám přehrávat: **{title}**\n{url}")
     else:
-        await interaction.followup.send(f"✅ Přidáno do fronty: {url}")
+        await interaction.followup.send(f"✅ Přidáno do fronty: **{title}**\n{url}")
 
 @bot.tree.command(name="další", description="Přeskoč na další písničku")
 async def dalsi_command(interaction: discord.Interaction):
@@ -793,8 +804,16 @@ async def fronta_command(interaction: discord.Interaction):
         if not queue:
             await interaction.response.send_message("❌ Fronta je prázdná!")
             return
-        items = "\n".join(f"{i+1}. {item['url']}" for i, item in enumerate(list(queue)[:10]))
-        embed = discord.Embed(title="🎵 Fronta", description=items, color=discord.Color.blue())
+        
+        # Formatuj frontu s názvy a linky
+        items = []
+        for i, item in enumerate(list(queue)[:10], 1):
+            title = item.get("title", "Neznámá skladba")
+            url = item.get("url", "")
+            items.append(f"{i}. {title}\n{url}")
+        
+        description = "\n\n".join(items)
+        embed = discord.Embed(title="🎵 Fronta", description=description, color=discord.Color.blue())
         await interaction.response.send_message(embed=embed)
     except Exception as e:
         await interaction.response.send_message(f"❌ Chyba: {str(e)[:100]}")
@@ -966,14 +985,21 @@ async def verze_command(interaction: discord.Interaction):
     """Show bot version and changelog."""
     try:
         embed = discord.Embed(title="ℹ️ Ježíš Discord Bot", color=discord.Color.gold())
-        embed.add_field(name="Verze", value="v2.2 – Minihry & Interakce", inline=False)
+        embed.add_field(name="Verze", value="v2.2.1 – Enhanced Queue Display", inline=False)
         embed.add_field(name="Co je nového", value="""
-✅ Kompletní přepis na slash commands
-✅ Czech názvy pro unikalitu
-✅ Game presence tracking se speciálními blessings
-✅ Daily verse streak s milestones
-✅ Hry zdarma: Embed + Discord link previews
-✅ **Nové v2.2**: Minihry & XP systém (kviz, versfight, rollblessing)
+**v2.2.1 – Enhanced Queue Display:**
+✨ `/fronta` zobrazuje strukturovaně: název skladby + URL pod sebou
+✨ Auto-extrakce názvů skladeb z YouTube do fronty
+✨ Všechny minihry z v2.2 plně funkční
+
+**v2.2 – Minihry & Interakce:**
+🎮 `/biblickykviz` – biblický trivia s 10 interaktivními otázkami
+🎮 `/versfight @user` – veršový duel se hlasováním
+🎮 `/rollblessing` – RNG požehnání (cooldown 1 hodina)
+🎮 `/profile [@user]` – profil s XP a levelem
+🏅 XP Systém: 🔰 Učedník → 📜 Prorok → 👑 Apoštol
+
+✅ Slash commands pro modernost a bezpečnost
 ❌ Žádné @ mention u automatických zpráv
 """, inline=False)
         embed.add_field(name="GitHub", value="https://github.com/Braska-botmaker/Chatbot-discord-JESUS", inline=False)
@@ -985,7 +1011,7 @@ async def verze_command(interaction: discord.Interaction):
 async def komandy_command(interaction: discord.Interaction):
     """Show all available commands."""
     try:
-        embed = discord.Embed(title="📋 Příkazy – Ježíš Discord Bot v2.2", color=discord.Color.blue())
+        embed = discord.Embed(title="📋 Příkazy – Ježíš Discord Bot v2.2.1", color=discord.Color.blue())
         embed.add_field(name="🎵 Hudba", value="""
 /yt <url> – Přehrávej z YouTube
 /další – Přeskoč
@@ -1030,7 +1056,7 @@ async def diag_command(interaction: discord.Interaction):
     voice_count = len(bot.voice_clients)
     embed.add_field(name="🎤 Voice", value=f"Connected: {voice_count}", inline=True)
     if bot.user:
-        embed.add_field(name="⏱️ Verze", value="v2.2\nMinihry & Interakce", inline=True)
+        embed.add_field(name="⏱️ Verze", value="v2.2.1\nEnhanced Queue Display", inline=True)
     await interaction.followup.send(embed=embed)
 
 # ═══════════════════════════════════════════════════════════════════════════════
