@@ -1,5 +1,5 @@
 # ╔════════════════════════════════════════════════════════════════════════════╗
-# ║           Ježíš Discord Bot v2.2.1 – Enhanced Queue Display             ║
+# ║           Ježíš Discord Bot v2.3 – Game Presence Engine 2.0              ║
 # ║                     Kompletní přepis na slash commands                      ║
 # ║                  s Czech názvy pro maximální unikalitu                      ║
 # ╚════════════════════════════════════════════════════════════════════════════╝
@@ -570,60 +570,65 @@ verses = [
 # ═══════════════════════════════════════════════════════════════════════════════
 
 game_blessings = {
-    "League of Legends": "Ať tě neodvede do pokušení toxicit, ale zbaví tě feederů.",
-    "Counter-Strike 2": "Ať jsou tvé reflexy rychlé a spoluhráči nejsou AFK.",
-    "Satisfactory": "Ať jsou tvé továrny efektivní a pásy nikdy nezaseknou.",
-    "Minecraft": "Ať draka prdel nakopeš!",
-    "Mafia": "Pamatuj – rodina je všechno. Ať tě ochrání před každým podrazem.",
-    "Mafia II": "Buď jako Vito – čestný mezi nečestnými. Ať tě nezasáhne zrada.",
-    "Resident Evil 2": "Ať ti nikdy nedojdou náboje v Raccoon City.",
-    "Resident Evil 3": "Ať tě Nemesis mine obloukem.",
-    "Resident Evil 4": "Ať tě El Gigante nezašlápne.",
-    "Resident Evil 7": "Ať přežiješ noc v domě Bakers.",
-    "Resident Evil 8": "Ať tě paní Dimitrescu nenajde pod sukní.",
-    "KLETKA": "Dej bacha, ať ti nedojde benzín, bratře.",
-    "КЛЕТЬ Демо": "Dej bacha na souseda.",
-    "Ready or Not": "Ať tě Pán vede v každé akci a dá ti klidnou hlavu v boji za spravedlnost.",
-    "Roblox": "Ať tvá kreativita roste a radost z hraní tě nikdy neopustí.",
-    "Counter-Strike: Global Offensive": "Ať je tvůj AIM přesný a týmoví kamarádi pevní.",
-    "Dota 2": "Ať tvůj draft vede k vítězství a toxicita tě míjí.",
-    "Cyberpunk 2077": "Ať tě budoucnost obohatí a ne zaženou noční můry.",
-    "Elden Ring": "Ať ten boss padne co nejrychleji bratře",
-    "Team Fortress 2": "Ať ti nostalgie nezahltí mozek",
-    "Rust": "Ať tě nikdo nezradí, jako mě kdysi",
-    "ARK: Survival Evolved": "Ať tvůj kmen přežije ve světě dinosaurů.",
-    "Grand Theft Auto V": "Ať tě nezavřou",
-    "Fall Guys": "Ať skončíš na trůnu a ne na posledním místě.",
-    "Terraria": "Ať tvé podzemí oplývá poklady a dobrodružstvím.",
-    "Phasmophobia": "Ať duchové zůstanou jen legendou a vy se vrátíte v klidu domů.",
-    "Valheim": "Ať tě Odin provede světy plnými výzev.",
-    "Among Us": "Ať vás bude hodně a zrada vyloučena.",
-    "Rocket League": "Ať tvůj tým střílí góly jako z evangelia radosti.",
-    "Black Desert Online": "Ať tvé cestování bohatě obohatí duchovní i materiální život.",
-    "The Witcher 3": "Ať tvá cesta po Ciri vedena moudrostí a milosrdenstvím.",
-    "Red Dead Redemption 2": "Ať tvá čest je silnější než touha po penězích",
-    "Hades": "Ať tvoje cesta z podsvětí vede k osvobození a odpuštění.",
-    "Tom Clancy's Rainbow Six Siege X": "Ať tvá taktika zachrání životy, ne přidá zármutek.",
-    "Skyrim": "Ať dračí křídla nevzbudí zlo, a tvé srdce zůstane silné.",
-    "The Binding of Isaac: Rebirth": "Ať ti rng bůh přeje a přinese ti všechny tier 4 předměty, které si přeješ.",
-    "Dead by Daylight": "Ať tě temnota nepohltí bratře v kristu.🙏",
-    "Project Zomboid": "Ať to ve zombie apokalypse zvládneš co nejdýl a najdeš aspoň trochu bezpečný barák, kde ti to nerozbijou nemrtví.",
-    "Half-Life": "Ať tě Freeman provede Borderworldem bez toho, aby tě cokoliv sežralo nebo rozdrtilo.",
-    "Half-Life 2": "Buď jako Gordon – tichej, ale všechno kolem tebe padá k zemi. Prostě efektivní jak prase.",
-    "Half-Life: Alyx": "Ať tě Combine nechytí a celá Alyxina mise dopadne tak epicky, jak si zaslouží.",
-    "VALORANT": "Ať tvůj aim lítá jak laser a týmová ekonomika se ti nerozsype po dvou kolech.",
-    "Arena Breakout: Infinite": "Ať v té betonce najdeš tu nejlepší lootárnu a exit zvládneš bez toho, aby tě někdo sundal.",
-    "Fallout": "Válka se fakt nemění… ale ty klidně můžeš a pěkně jim to tam nalož.",
-    "Fallout 2": "Ať tvoje cesta mezi Vault Dwellery skončí spíš oslavou než atomovým ohňostrojem.",
-    "Fallout 3": "Ať Project Purity fakt zachrání svět a neskončí to jen dalším radioaktivním fiaskem.",
-    "Fallout: New Vegas": "Ať už půjdeš s Yes Manem, NCR nebo Caesarovými blázny, ať ti to padne do noty a Vegas je tvoje.",
-    "Fallout 4": "Ať najdeš svého potomka a Commonwealth dáš dohromady dřív, než ho někdo vyhodí do vzduchu.",
-    "Fallout 76": "Ať v pustině narazíš na živý lidi a ne jen na mrtvý servery a prázdný lokace.",
-    "Kingdom Come: Deliverance": "Ať tvoje jízdy na Šedivce kolem Ratají skončí vždycky na sedle, ne na zemi.",
-    "Kingdom Come: Deliverance II": "Ať se Jindra dočká své odvety a království zůstane v bezpečí.",
-    "Outlast": "Ať tě Chris Walker nikdy nedostane.",
-    "Outlast 2": "Ať tě basketbalistka nikdy nedostane.",
-    "The Outlast Trials": "Ať testy přežiješ se všemi končetinami a žaludkem na místě.",
+    "League of Legends": "Ať tě **toxicita** mine obloukem ↩️ a spoluhráči konečně pochopí, že **věž se nepushuje sama**! 🏰",
+    "Counter-Strike 2": "Ať ti sedne **AIM** 🎯 a nenarazíš na žádnýho **bota** 🤖, co si koupil cheaty.",
+    "Satisfactory": "Ať ti **továrna** jede plynule ⚙️ a ne jako by ji stavěl nějakej **opilec**! 🍺",
+    "Minecraft": "Ať **diamanty** 💎 najdeš dřív než ztratíš **trpělivost** s těma creeperama. 💥",
+    "Mafia": "Pamatuj, **Přátelství je sračka** 🤫. Buď jako Tommy. **Čest** je to jediný, co tě drží nad vodou. 👔",
+    "Mafia II": "Vítej v **rodině** 🤝. Ať ti mafiánský život v Empire Bay vydrží co nejdýl.",
+    "Resident Evil 2": "Ať máš v Raccoon City **dost nábojů** 🔫 a ten G-Virus tě nechá na pokoji. 🧟",
+    "Resident Evil 3": "Ať **Nemesis** dá pokoj a jde otravovat někoho, kdo o to fakt stojí. **STARS!** 🏃‍♀️",
+    "Resident Evil 4": "Ať tě **Ashley nesere** 😠. Ať máš na ní štěstí a nechodí ti do rány.",
+    "Resident Evil 7": "Ať noc u **Bakerů** přežiješ s co nejmenším **psychickým poškozením** 🧠. Vítej v rodině... zase. 🏚️",
+    "Resident Evil 8": "Ať tě **paní Dimitrescu** nenechá na pokoji. Ať ti dá pokoj, ale... Ať tě **nenajde** 😩.",
+    "KLETKA": "Ať ti **benzín nikdy nedojde** ⛽. V téhle díře bys zůstat nechtěl, věř mi.",
+    "КЛЕТЬ Демо": "Ať tě **soused** radši ignoruje. Přejeme ti co nejdelší život. 🤞",
+    "Ready or Not": "Ať máš **klidnou hlavu** 🧘. Jeden špatný pohyb a víš, jak to končí. **Clear!** 🚨",
+    "Roblox": "Ať tě napadají jen ty **dobrý nápady** ✨ a radost ze hry ti vydrží dlouho. **Tvoř a vládni!**",
+    "Counter-Strike: Global Offensive": "Ať tě **AIM** podrží 🎯 a tvůj **tým** nestojí za **hovno**! 💩",
+    "Dota 2": "Ať tvůj **draft** drží pohromadě 🛡️ a **chat** zůstane tišejší než obvykle. **GG WP.**",
+    "Cyberpunk 2077": "Pamatuj, **Johnny není vždycky zmrd** 🤘. Užij si Night City, V.",
+    "Elden Ring": "Ať **boss** padne dřív, než ti stihne zlomit vůli 💔. **YOU DIED.**",
+    "Team Fortress 2": "Ať ti **nostalgie** zabíjí míň než nepřátelská **Pyro** 🔥. *Mmmph Mmmph!*",
+    "Rust": "Ať ti **základna** drží 🧱 a sousedi nejsou **psychopati s raketometem** 🚀.",
+    "ARK: Survival Evolved": "Ať tě **dinosauři** spíš respektují než konzumují. **Tame all the things!** 🦖",
+    "Grand Theft Auto V": "Ať **nenarazíš na moddery** 🚫 a tvoje peněženka zůstane plná. 💵",
+    "Fall Guys": "Ať tě to **nevyhodí** na poslední překážce. **Koruna čeká!** 👑",
+    "Terraria": "Ať tvoje **podzemí** skrývá víc **pokladů** 💰 než pastí. 罠",
+    "Phasmophobia": "Ať **duchové** jen šeptají do mikrofonu 🎤 a ne do duše. **Evidence!**",
+    "Valheim": "Ať tě **vítr** 🌬️ vede správným směrem a loď ti neodjede bez tebe. **Skål!** 🍻",
+    "Among Us": "Ať tě **impostor** neodpráskne hned po startu 🔪 a posádka používá **mozek**! 🧠",
+    "Rocket League": "Ať ti to lítá do **brány** 🥅 a ne naprosto mimo stadion. **Calculated!**",
+    "The Witcher 3": "Ať cesta za **Ciri** je klidná, **rozhodnutí rozumná** 🧐 a Gwent ti jde líp než všem hospodskejm dohromady. 🃏",
+    "Red Dead Redemption 2": "Ať si udržíš **čest** ✨ a koně ti nikdy **nesestřelí náhodný idiot** v lese. 🐴",
+    "Hades": "Ať se **Zagreus** konečně dostane **nahoru** ⬆️ bez dalších pater agrese. **Chthonic!**",
+    "Tom Clancy's Rainbow Six Siege X": "Ať ti **taktika** sedne 🛡️ a **drony** ukážou všechno, co mají. **Pew pew!**",
+    "Skyrim": "Ať tě **draci** nechají v klidu 🐉 a **Fus Ro Dah** používáš jen, když opravdu **chceš** 📢.",
+    "The Binding of Isaac: Rebirth": "Ať **RNG** konečně jednou stojí na tvojí straně. **Bůh ti žehnej!** 🙏",
+    "Dead by Daylight": "Ať tě **Killer** míjí 🔪 a tvoje **loopování** má styl. **Run!** 🏃",
+    "Project Zomboid": "Ať přežiješ další den 🗓️ a **nemrtví** ti nerozbijou barák na cihly. **Společnost!** 🧟",
+    "Half-Life": "Ať tě nic nesežere 👽 a **Freeman** by se za tebe nemusel stydět. 🔬",
+    "Half-Life 2": "Ať jdeš dopředu stejně tiše a **efektivně** jako **Gordon** 💥.",
+    "Half-Life: Alyx": "Ať **Combine** neví, že existuješ, dokud není **pozdě** 💥.",
+    "VALORANT": "Ať ti **AIM drží** 🎯 a **economia** se nezhroutí během dvou kol. **Jistota!**",
+    "Arena Breakout: Infinite": "Ať **extrahueš s lootem** 💰 a vrátíš se bez jedinýho škrábance. **PMC master!**",
+    "Fallout": "Ať tě **pustina nezlomí** 💔 a **atomovky** zůstanou jen na ozdobu. ☢️",
+    "Fallout 2": "Ať tvoje cesta končí spíš **úsměvem** 😊 než velkým **bum**! 💣",
+    "Fallout 3": "Ať **Project Purity** konečně udělá svět **lepším místem** 💧.",
+    "Fallout: New Vegas": "Ať ti **plán vyjde** 🤞 a **Vegas** je opravdu tvoje. **The Strip!** 🎰",
+    "Fallout 4": "Ať najdeš, co hledáš 👀, a **Commonwealth** dáš do kupy. 🛠️",
+    "Fallout 76": "Ať potkáš víc **lidí** 🤝 než prázdných baráků. **Welcome home!**",
+    "Kingdom Come: Deliverance": "Ať tvoje jízdy na **Šedivce** 🐴 neskončí držkou v blátě. **Jindřich!** 🛡️",
+    "Kingdom Come: Deliverance II": "Ať se **Jindra** dočká **klidu** a ty nepadáš v každým souboji. **Bojuj!** ⚔️",
+    "Outlast": "Ať tě **Chris Walker** nikdy nechytí 🏃. *Shut up, little piggy.* 🐷",
+    "Outlast 2": "Ať ti **basketbalistka** 🧺 dá pokoj. Radši si najdi jiný cíl.",
+    "The Outlast Trials": "Ať **přežiješ testy** 🧪 se všemi **končetinami** na místě. **Reagent!**",
+    "Escape from Tarkov": "Ať tě nezastřelí týpek s **TOZkou přes půl mapy** 🚫 a extrahuješ dřív, než ti dojde **krev** 🩸.",
+    "The Last of Us": "Ať tě **svět nezlomí** a každý krok stojí za to. **Přežij!** 🦠",
+    "Dark Souls III": "Ať **boss padne** dřív, než ty padneš **psychicky** 😵. **Praise the Sun!** 🌞",
+    "Starfield": "Ať tvůj **vesmír** 🌌 není prázdnější než půlka galaxií, co jsi už viděl. **Discovery!**",
+    "Forza Horizon 5": "Ať ti to **klouže** jen když chceš 🏎️, ne když to zrovna nejmíň potřebuješ. **Drift master!**",
+    "Genshin Impact": "Ať jsou tvé **denní krystaly** 🔮 vždy plné a ať ti Pán zabrání farmiť **Artifacty** s těmi nejhoršími staty. 😇",
 }
 
 # ═══════════════════════════════════════════════════════════════════════════════
@@ -985,18 +990,21 @@ async def verze_command(interaction: discord.Interaction):
     """Show bot version and changelog."""
     try:
         embed = discord.Embed(title="ℹ️ Ježíš Discord Bot", color=discord.Color.gold())
-        embed.add_field(name="Verze", value="v2.2.1 – Enhanced Queue Display", inline=False)
+        embed.add_field(name="Verze", value="v2.3 – Game Presence Engine 2.0", inline=False)
         embed.add_field(name="Co je nového", value="""
+**v2.3 – Game Presence Engine 2.0:** (AKTUÁLNÍ)
+🎮 Automatické sledování hraných her uživatelů
+🎮 Personalizovaná požehnání podle hrané hry (54 her)
+📊 `/profile` s TOP 5 herami, server rankingem
+🎖️ Auto-role: Gamer (1+ hodina), Night Warrior (23:00+), Weekend Crusader (víkend)
+✨ Event listener `on_presence_update()` pro automatické blessings
+
 **v2.2.1 – Enhanced Queue Display:**
-✨ `/fronta` zobrazuje strukturovaně: název skladby + URL pod sebou
-✨ Auto-extrakce názvů skladeb z YouTube do fronty
-✨ Všechny minihry z v2.2 plně funkční
+✨ `/fronta` zobrazuje strukturovaně: název + URL
+✨ Auto-extrakce názvů skladeb z YouTube
 
 **v2.2 – Minihry & Interakce:**
-🎮 `/biblickykviz` – biblický trivia s 10 interaktivními otázkami
-🎮 `/versfight @user` – veršový duel se hlasováním
-🎮 `/rollblessing` – RNG požehnání (cooldown 1 hodina)
-🎮 `/profile [@user]` – profil s XP a levelem
+🎮 `/biblickykviz`, `/versfight`, `/rollblessing`, `/profile`
 🏅 XP Systém: 🔰 Učedník → 📜 Prorok → 👑 Apoštol
 
 ✅ Slash commands pro modernost a bezpečnost
@@ -1011,7 +1019,7 @@ async def verze_command(interaction: discord.Interaction):
 async def komandy_command(interaction: discord.Interaction):
     """Show all available commands."""
     try:
-        embed = discord.Embed(title="📋 Příkazy – Ježíš Discord Bot v2.2.1", color=discord.Color.blue())
+        embed = discord.Embed(title="📋 Příkazy – Ježíš Discord Bot v2.3", color=discord.Color.blue())
         embed.add_field(name="🎵 Hudba", value="""
 /yt <url> – Přehrávej z YouTube
 /další – Přeskoč
@@ -1031,11 +1039,11 @@ async def komandy_command(interaction: discord.Interaction):
 /diag – Diagnostika
 /komandy – Tohle
 """, inline=False)
-        embed.add_field(name="🎮 Minihry (v2.2)", value="""
+        embed.add_field(name="🎮 Minihry & Hry (v2.3)", value="""
 /biblickykviz – Biblický trivia
 /versfight @user – Veršový duel
 /rollblessing – RNG požehnání
-/profile [@user] – Tvůj profil + XP
+/profile [@user] – Profil s XP, TOP 5 herami, rankingem, rolemi (v2.3)
 """, inline=False)
         await interaction.response.send_message(embed=embed)
     except Exception as e:
@@ -1056,7 +1064,7 @@ async def diag_command(interaction: discord.Interaction):
     voice_count = len(bot.voice_clients)
     embed.add_field(name="🎤 Voice", value=f"Connected: {voice_count}", inline=True)
     if bot.user:
-        embed.add_field(name="⏱️ Verze", value="v2.2.1\nEnhanced Queue Display", inline=True)
+        embed.add_field(name="⏱️ Verze", value="v2.3\nGame Presence Engine 2.0", inline=True)
     await interaction.followup.send(embed=embed)
 
 # ═══════════════════════════════════════════════════════════════════════════════
@@ -1184,6 +1192,11 @@ async def on_presence_update(before, after):
     before_game = next((a for a in before.activities if is_game_activity(a)), None)
     after_game = next((a for a in after.activities if is_game_activity(a)), None)
 
+    # V2.3 TRACKING: Zaznamenej hry
+    if after_game:
+        track_user_activity(after)
+        await assign_game_roles(after)
+
     # Hra začala
     if before_game is None and after_game is not None:
         game_name = after_game.name
@@ -1219,7 +1232,7 @@ async def on_presence_update(before, after):
         print(f"[presence] {after.name} stopped playing: {before_game.name}")
 
 # ═══════════════════════════════════════════════════════════════════════════════
-#                    15. MINIHRY & INTERAKCE (v2.2)
+#                 14. MINIHRY & INTERAKCE (v2.2)
 # ═══════════════════════════════════════════════════════════════════════════════
 
 # XP tracking a role progression
@@ -1494,12 +1507,14 @@ async def rollblessing_command(interaction: discord.Interaction):
     )
     await interaction.response.send_message(embed=embed)
 
-@bot.tree.command(name="profile", description="Zobraz svůj profil s XP a levelem")
+@bot.tree.command(name="profile", description="Zobraz svůj profil s XP, levelem a hrami (v2.3)")
 async def profile_command(interaction: discord.Interaction, user: discord.User = None):
-    """Zobraz profil hráče s XP a levelem."""
+    """Zobraz kompletní profil hráče s XP, levelem a game statistikami."""
     target = user or interaction.user
     user_id = target.id
+    guild = interaction.guild
     
+    # ═══ XP DATA ═══
     if user_id not in user_xp:
         user_xp[user_id] = {"xp": 0, "level": "🔰 Učedník"}
     
@@ -1513,24 +1528,160 @@ async def profile_command(interaction: discord.Interaction, user: discord.User =
     elif xp < 300:
         next_milestone = 300
     else:
-        next_milestone = xp + 100  # Další milník
+        next_milestone = xp + 100
     
     progress = ((xp % (next_milestone // 2)) / (next_milestone // 2)) * 100
     progress_bar = "█" * int(progress // 10) + "░" * (10 - int(progress // 10))
     
+    # ═══ GAME DATA (v2.3) ═══
+    user_game_data = get_game_data(user_id)
+    sorted_games = sorted(user_game_data["games"].items(), key=lambda x: x[1], reverse=True)
+    top_5 = sorted_games[:5]
+    total_hours = sum(hours for _, hours in sorted_games)
+    
+    games_text = ""
+    if top_5:
+        games_text = "\n".join([f"🎮 **{game}**: {hours:.1f}h" for game, hours in top_5])
+    else:
+        games_text = "Zatím žádné hry nejsou zaznamenány."
+    
+    # ═══ RANKING (v2.3) ═══
+    ranking_text = "❌ Žádná data"
+    if guild:
+        player_stats = []
+        for member in guild.members:
+            if member.bot:
+                continue
+            member_game_data = get_game_data(member.id)
+            member_hours = sum(member_game_data["games"].values())
+            if member_hours > 0:
+                player_stats.append((member.id, member_hours))
+        
+        if player_stats:
+            player_stats.sort(key=lambda x: x[1], reverse=True)
+            rank = next((i+1 for i, (mid, _) in enumerate(player_stats) if mid == user_id), None)
+            if rank:
+                ranking_text = f"#{rank} z {len(player_stats)} hráčů"
+    
+    # ═══ EMBED ═══
     embed = discord.Embed(
         title=f"👤 Profil – {target.name}",
         color=discord.Color.gold()
     )
+    
+    # XP sekce
     embed.add_field(name="🏅 Level", value=level, inline=True)
     embed.add_field(name="⭐ XP", value=f"{xp}", inline=True)
     embed.add_field(name="📊 Progres", value=f"{progress_bar} {int(progress)}%", inline=False)
+    
+    # Game sekce
+    embed.add_field(name="🎮 TOP 5 Her", value=games_text, inline=False)
+    embed.add_field(name="⏱️ Celkem", value=f"{total_hours:.1f}h", inline=True)
+    embed.add_field(name="🏆 Ranking", value=ranking_text, inline=True)
+    
+    # Role sekce
+    member_obj = guild.get_member(user_id) if guild else None
+    if member_obj:
+        roles_earned = []
+        if total_hours >= 1:
+            roles_earned.append("🎮 Gamer")
+        if member_obj.activity and datetime.datetime.now().hour >= 23:
+            roles_earned.append("🌙 Night Warrior")
+        if member_obj.activity and datetime.datetime.now().weekday() >= 5:
+            roles_earned.append("⛪ Weekend Crusader")
+        
+        roles_text = " ".join(roles_earned) if roles_earned else "Žádné speciální role"
+        embed.add_field(name="🎖️ Role (v2.3)", value=roles_text, inline=False)
+    
     embed.set_thumbnail(url=target.avatar.url if target.avatar else None)
     
     await interaction.response.send_message(embed=embed)
 
 # ═══════════════════════════════════════════════════════════════════════════════
-#                      16. MAIN ENTRY POINT
+#                 13. V2.3 – GAME PRESENCE ENGINE 2.0
+# ═══════════════════════════════════════════════════════════════════════════════
+
+# Tracking hraných her
+game_activity = {}  # {user_id: {"games": {game_name: hours}, "last_update": timestamp}}
+
+def get_game_data(user_id: int):
+    """Vrátí nebo vytvoří data hry pro uživatele."""
+    if user_id not in game_activity:
+        game_activity[user_id] = {"games": {}, "last_update": datetime.datetime.now()}
+    return game_activity[user_id]
+
+def track_user_activity(member: discord.Member):
+    """Sleduj hry které člen hraje."""
+    if not member.activity or member.activity.type != discord.ActivityType.playing:
+        return
+    
+    game_name = member.activity.name
+    user_data = get_game_data(member.id)
+    
+    if game_name not in user_data["games"]:
+        user_data["games"][game_name] = 0
+    
+    # Přidej čas hraní
+    now = datetime.datetime.now()
+    last_update = user_data["last_update"]
+    time_delta = (now - last_update).total_seconds() / 3600
+    user_data["games"][game_name] += time_delta
+    user_data["last_update"] = now
+
+
+# ═══════════════════════════════════════════════════════════════════════════════
+#                 15. V2.3 – GAME PRESENCE ENGINE 2.0
+# ═══════════════════════════════════════════════════════════════════════════════
+
+# Tracking hraných her
+
+async def assign_game_roles(member: discord.Member):
+    """Přiřaď role na základě her."""
+    if member.bot:
+        return
+    
+    guild = member.guild
+    user_data = get_game_data(member.id)
+    
+    # Najdi nebo vytvoř role
+    role_names = {
+        "gamer": "🎮 Gamer",
+        "night_warrior": "🌙 Night Warrior",
+        "weekend_crusader": "⛪ Weekend Crusader"
+    }
+    
+    # Kalkuluj game hours a přiřaď role
+    total_hours = sum(user_data["games"].values())
+    
+    try:
+        # 🎮 Gamer role (1+ hodina hraní)
+        if total_hours >= 1:
+            role = discord.utils.get(guild.roles, name=role_names["gamer"])
+            if not role:
+                role = await guild.create_role(name=role_names["gamer"], color=discord.Color.blue())
+            if role not in member.roles:
+                await member.add_roles(role)
+        
+        # 🌙 Night Warrior role (hrajou po 23:00)
+        if member.activity and datetime.datetime.now().hour >= 23:
+            role = discord.utils.get(guild.roles, name=role_names["night_warrior"])
+            if not role:
+                role = await guild.create_role(name=role_names["night_warrior"], color=discord.Color.dark_gray())
+            if role not in member.roles:
+                await member.add_roles(role)
+        
+        # ⛪ Weekend Crusader role (hrajou o víkendu)
+        if member.activity and datetime.datetime.now().weekday() >= 5:
+            role = discord.utils.get(guild.roles, name=role_names["weekend_crusader"])
+            if not role:
+                role = await guild.create_role(name=role_names["weekend_crusader"], color=discord.Color.gold())
+            if role not in member.roles:
+                await member.add_roles(role)
+    except Exception as e:
+        print(f"[v2.3] Error assigning roles: {e}")
+
+# ═══════════════════════════════════════════════════════════════════════════════
+#                   16. MAIN ENTRY POINT
 # ═══════════════════════════════════════════════════════════════════════════════
 
 if __name__ == "__main__":

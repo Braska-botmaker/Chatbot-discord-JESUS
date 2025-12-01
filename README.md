@@ -1,6 +1,6 @@
 # ✝️ Ježíš Discord Bot – hudba, verše a hry zdarma 🙏
 
-**Verze:** v2.2.1 – Enhanced Queue Display | **Platform:** Raspberry Pi Ready
+**Verze:** v2.3 – Game Presence Engine 2.0 | **Platform:** Raspberry Pi Ready
 
 Discord bot napsaný v Pythonu (discord.py), který umí:
 
@@ -170,7 +170,7 @@ Voice práva v cílovém kanálu:
 
 ---
 
-## ⌨️ Příkazy (Slash Commands – v2.2.1)
+## ⌨️ Příkazy (Slash Commands – v2.3)
 
 Hezký přehled najdete v `/komandy`. Základ:
 
@@ -194,12 +194,12 @@ Hezký přehled najdete v `/komandy`. Základ:
 * `/bless @uživatel` – krátké osobní požehnání
 * `/komandy` – kompletní seznam příkazů
 
-### Minihry (v2.2)
+### Minihry & Hry (v2.3)
 
 * `/biblickykviz` – biblický trivia systém s 10 otázkami
 * `/versfight @user` – veršový duel mezi hráči (hlasování, XP)
 * `/rollblessing` – RNG požehnání s cooldown 1 hodina
-* `/profile [@user]` – profil s XP a levelem (učedník → prorok → apoštol)
+* `/profile [@user]` – kompletní profil s XP, TOP 5 herami, rankingem a rolemi (v2.3)
 
 
 ---
@@ -382,14 +382,23 @@ python3 tools/rpi_voice_diagnostics.py
 
 ## 🛣️ Roadmapa – Ježíš Discord Bot (v2.x → v3.x)
 
-### 🟩 v2.2.1 (AKTUÁLNÍ VERZE – Enhanced Queue Display)
+### 🟩 v2.3 (AKTUÁLNÍ VERZE – Game Presence Engine 2.0)
 
-Nyní aktivní! Vylepšená hudební fronta:
-* ✅ Všechny minihry z v2.2 (kviz, versfight, rollblessing, profile)
+Nyní aktivní! Pokročilé sledování a management her:
+* ✅ Automatické sledování hraných her uživatelů
+* ✅ Personalizovaná požehnání podle hrané hry (54 her)
+* ✅ **Nové v2.3**: `/profile` s TOP 5 herami, server rankingem, role achievements
+* ✅ Auto-role: 🎮 Gamer, 🌙 Night Warrior, ⛪ Weekend Crusader
+* ✅ Hudba, verše, minihry z v2.2, presence tracking
+
+### 🟩 v2.2.1 (LEGACY – Enhanced Queue Display)
+
+Starší verze s hudbou:
+* ✅ `/fronta` zobrazuje názvy skladeb + URL (strukturovaně)
+* ✅ Hudba s českými názvy (auto-extrakce z YouTube)
+* ✅ Všechny minihry z v2.2 (kviz, versfight, rollblessing, profile basic)
 * ✅ XP systém: 🔰 Učedník → 📜 Prorok → 👑 Apoštol
-* ✅ **Nové v2.2.1**: `/fronta` zobrazuje názvy skladeb + URL (strukturovaně)
-* ✅ Hudba s českými názvy (auto-extrakce názvu z YouTube)
-* ✅ Všechny minihry, hry zdarma, verse streak, presence tracking
+* ✅ Hry zdarma, verse streak
 
 ### 🟩 v2.2 (PŘEDCHOZÍ VERZE – Minihry & Interakce)
 
@@ -407,11 +416,6 @@ Starší verze:
 * ✅ 24/7 scheduled tasks (ranní zprávy, noční zprávy, free games)
 * ✅ RPi voice patches (Error 4006 – exponential backoff)
 
-### 🟥 v2.0.5e (LEGACY – Prefix Commands)
-
-Zastaralá verze s prefix commands. Zálohováno jako `bot_v2_0_5e_backup.py`
-
-
 
 ## ✨ v2.2 – Minihry & Interakce (HOTOVO)
 * `/biblickykviz` – biblický trivia systém  
@@ -422,12 +426,12 @@ Zastaralá verze s prefix commands. Zálohováno jako `bot_v2_0_5e_backup.py`
 
 
 
-## 🎮 v2.3 – Game Presence Engine 2.0
-* pokročilé sledování hraných her uživatelů  
-* personalizovaná požehnání podle hrané hry  
-* týdenní shrnutí hraní hráčů  
-* statistiky: nejhranější hry, nejaktivnější hráči, společné hraní  
-* auto-role typu „Gamer“, „Night Warrior“, „Weekend Crusader“  
+## 🎮 v2.3 – Game Presence Engine 2.0 (HOTOVO ✅)
+* ✅ Pokročilé sledování hraných her uživatelů  
+* ✅ Personalizovaná požehnání podle hrané hry (54 her)  
+* ✅ Server ranking a statistiky: TOP 5 her, celkový čas  
+* ✅ Auto-role: 🎮 Gamer (1+ hodina), 🌙 Night Warrior (23:00+), ⛪ Weekend Crusader (víkend)  
+* ✅ `/profile` integruje veškeré game presence data
 
 
 
