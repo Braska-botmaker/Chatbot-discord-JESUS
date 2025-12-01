@@ -1,5 +1,5 @@
 # ╔════════════════════════════════════════════════════════════════════════════╗
-# ║           Ježíš Discord Bot v2.3 – Game Presence Engine 2.0              ║
+# ║      Ježíš Discord Bot v2.3.1 – Multi-Server Thread-Safety Patch      ║
 # ║                     Kompletní přepis na slash commands                      ║
 # ║                  s Czech názvy pro maximální unikalitu                      ║
 # ╚════════════════════════════════════════════════════════════════════════════╝
@@ -643,6 +643,9 @@ async def on_ready():
     # Načti verse streak z storage
     await load_verse_streak_from_storage()
     
+    # Načti game activity z storage
+    await load_game_activity_from_storage()
+    
     try:
         synced = await bot.tree.sync()
         print(f"[commands] Synced {len(synced)} slash commands")
@@ -654,6 +657,7 @@ async def on_ready():
     send_free_games.start()
     voice_watchdog.start()
     clear_recent_announcements.start()
+    track_game_activity_periodic.start()
 
 # ═══════════════════════════════════════════════════════════════════════════════
 #                11. SLASH COMMANDS – HUDBA / MUSIC
@@ -894,6 +898,50 @@ async def save_verse_streak_to_storage():
     except Exception as e:
         print(f"[verse] Failed to save verse streak: {e}")
 
+async def load_game_activity_from_storage():
+    """Načti game activity z persistent storage (bot_data.json)."""
+    global game_activity
+    try:
+        db = _load_data()
+        if "game_activity" in db:
+            activity_data = db["game_activity"]
+            for user_id_str, data in activity_data.items():
+                user_id = int(user_id_str)
+                last_update = None
+                if data.get("last_update"):
+                    try:
+                        last_update = datetime.datetime.fromisoformat(data["last_update"])
+                    except:
+                        last_update = datetime.datetime.now()
+                else:
+                    last_update = datetime.datetime.now()
+                
+                game_activity[user_id] = {
+                    "games": data.get("games", {}),
+                    "last_update": last_update
+                }
+            print(f"[game_activity] Loaded game data for {len(game_activity)} users")
+    except Exception as e:
+        print(f"[game_activity] Failed to load: {e}")
+
+async def save_game_activity_to_storage():
+    """Ulož game activity do persistent storage (bot_data.json)."""
+    try:
+        db = _load_data()
+        activity_data = {}
+        for user_id, data in game_activity.items():
+            last_update_str = None
+            if data.get("last_update"):
+                last_update_str = data["last_update"].isoformat()
+            activity_data[str(user_id)] = {
+                "games": data.get("games", {}),
+                "last_update": last_update_str
+            }
+        db["game_activity"] = activity_data
+        await _save_data(db)
+    except Exception as e:
+        print(f"[game_activity] Failed to save: {e}")
+
 @bot.tree.command(name="verse", description="Random biblický verš")
 async def verse_command(interaction: discord.Interaction):
     """Send random Bible verse with daily streak tracking."""
@@ -990,14 +1038,23 @@ async def verze_command(interaction: discord.Interaction):
     """Show bot version and changelog."""
     try:
         embed = discord.Embed(title="ℹ️ Ježíš Discord Bot", color=discord.Color.gold())
-        embed.add_field(name="Verze", value="v2.3 – Game Presence Engine 2.0", inline=False)
+        embed.add_field(name="Verze", value="v2.3.1 – Multi-Server Thread-Safety Patch", inline=False)
         embed.add_field(name="Co je nového", value="""
-**v2.3 – Game Presence Engine 2.0:** (AKTUÁLNÍ)
+**v2.3.1 – Multi-Server Thread-Safety Patch:** (AKTUÁLNÍ)
+🔒 NOVÉ: Guild-level locks pro bezpečné vytváření rolí
+📊 NOVÉ: Periodic game tracking se storage (každých 5 minut)
+⚡ NOVÉ: Real-time herní statistiky bez race conditions
 🎮 Automatické sledování hraných her uživatelů
 🎮 Personalizovaná požehnání podle hrané hry (54 her)
 📊 `/profile` s TOP 5 herami, server rankingem
 🎖️ Auto-role: Gamer (1+ hodina), Night Warrior (23:00+), Weekend Crusader (víkend)
-✨ Event listener `on_presence_update()` pro automatické blessings
+✨ Multi-server ready – bez konflikty dat!
+
+**v2.3 – Game Presence Engine 2.0:**
+🎮 Automatické sledování hraných her uživatelů
+🎮 Personalizovaná požehnání podle hrané hry (54 her)
+📊 `/profile` s TOP 5 herami, server rankingem
+🎖️ Auto-role: Gamer (1+ hodina), Night Warrior (23:00+), Weekend Crusader (víkend)
 
 **v2.2.1 – Enhanced Queue Display:**
 ✨ `/fronta` zobrazuje strukturovaně: název + URL
@@ -1008,7 +1065,6 @@ async def verze_command(interaction: discord.Interaction):
 🏅 XP Systém: 🔰 Učedník → 📜 Prorok → 👑 Apoštol
 
 ✅ Slash commands pro modernost a bezpečnost
-❌ Žádné @ mention u automatických zpráv
 """, inline=False)
         embed.add_field(name="GitHub", value="https://github.com/Braska-botmaker/Chatbot-discord-JESUS", inline=False)
         await interaction.response.send_message(embed=embed)
@@ -1019,7 +1075,7 @@ async def verze_command(interaction: discord.Interaction):
 async def komandy_command(interaction: discord.Interaction):
     """Show all available commands."""
     try:
-        embed = discord.Embed(title="📋 Příkazy – Ježíš Discord Bot v2.3", color=discord.Color.blue())
+        embed = discord.Embed(title="📋 Příkazy – Ježíš Discord Bot v2.3.1", color=discord.Color.blue())
         embed.add_field(name="🎵 Hudba", value="""
 /yt <url> – Přehrávej z YouTube
 /další – Přeskoč
@@ -1039,11 +1095,11 @@ async def komandy_command(interaction: discord.Interaction):
 /diag – Diagnostika
 /komandy – Tohle
 """, inline=False)
-        embed.add_field(name="🎮 Minihry & Hry (v2.3)", value="""
+        embed.add_field(name="🎮 Minihry & Hry (v2.3.1)", value="""
 /biblickykviz – Biblický trivia
 /versfight @user – Veršový duel
 /rollblessing – RNG požehnání
-/profile [@user] – Profil s XP, TOP 5 herami, rankingem, rolemi (v2.3)
+/profile [@user] – Profil s XP, TOP 5 herami, rankingem, rolemi (v2.3.1)
 """, inline=False)
         await interaction.response.send_message(embed=embed)
     except Exception as e:
@@ -1064,12 +1120,34 @@ async def diag_command(interaction: discord.Interaction):
     voice_count = len(bot.voice_clients)
     embed.add_field(name="🎤 Voice", value=f"Connected: {voice_count}", inline=True)
     if bot.user:
-        embed.add_field(name="⏱️ Verze", value="v2.3\nGame Presence Engine 2.0", inline=True)
+        embed.add_field(name="⏱️ Verze", value="v2.3.1\nMulti-Server Thread-Safety", inline=True)
     await interaction.followup.send(embed=embed)
 
 # ═══════════════════════════════════════════════════════════════════════════════
 #                13. SCHEDULED TASKS – AUTOMATICKÉ ZPRÁVY
 # ═══════════════════════════════════════════════════════════════════════════════
+
+@tasks.loop(minutes=5)
+async def track_game_activity_periodic():
+    """Měř čas hry každých 5 minut pro všechny online hráče."""
+    try:
+        for guild in bot.guilds:
+            for member in guild.members:
+                if member.bot or member.status != discord.Status.online:
+                    continue
+                
+                # Pokud hraje hru, zaznamenej čas
+                if member.activity and member.activity.type == discord.ActivityType.playing:
+                    track_user_activity(member)
+        
+        # Ulož data do storage po každém updatu
+        await save_game_activity_to_storage()
+    except Exception as e:
+        print(f"[track_periodic] Error: {e}")
+
+@track_game_activity_periodic.before_loop
+async def before_track_periodic():
+    await bot.wait_until_ready()
 
 @tasks.loop(minutes=1)
 async def send_morning_message():
@@ -1192,7 +1270,7 @@ async def on_presence_update(before, after):
     before_game = next((a for a in before.activities if is_game_activity(a)), None)
     after_game = next((a for a in after.activities if is_game_activity(a)), None)
 
-    # V2.3 TRACKING: Zaznamenej hry
+    # V2.3.1 TRACKING: Zaznamenej hry
     if after_game:
         track_user_activity(after)
         await assign_game_roles(after)
@@ -1507,7 +1585,7 @@ async def rollblessing_command(interaction: discord.Interaction):
     )
     await interaction.response.send_message(embed=embed)
 
-@bot.tree.command(name="profile", description="Zobraz svůj profil s XP, levelem a hrami (v2.3)")
+@bot.tree.command(name="profile", description="Zobraz svůj profil s XP, levelem a hrami (v2.3.1)")
 async def profile_command(interaction: discord.Interaction, user: discord.User = None):
     """Zobraz kompletní profil hráče s XP, levelem a game statistikami."""
     target = user or interaction.user
@@ -1533,7 +1611,7 @@ async def profile_command(interaction: discord.Interaction, user: discord.User =
     progress = ((xp % (next_milestone // 2)) / (next_milestone // 2)) * 100
     progress_bar = "█" * int(progress // 10) + "░" * (10 - int(progress // 10))
     
-    # ═══ GAME DATA (v2.3) ═══
+    # ═══ GAME DATA (v2.3.1) ═══
     user_game_data = get_game_data(user_id)
     sorted_games = sorted(user_game_data["games"].items(), key=lambda x: x[1], reverse=True)
     top_5 = sorted_games[:5]
@@ -1545,7 +1623,7 @@ async def profile_command(interaction: discord.Interaction, user: discord.User =
     else:
         games_text = "Zatím žádné hry nejsou zaznamenány."
     
-    # ═══ RANKING (v2.3) ═══
+    # ═══ RANKING (v2.3.1) ═══
     ranking_text = "❌ Žádná data"
     if guild:
         player_stats = []
@@ -1591,18 +1669,26 @@ async def profile_command(interaction: discord.Interaction, user: discord.User =
             roles_earned.append("⛪ Weekend Crusader")
         
         roles_text = " ".join(roles_earned) if roles_earned else "Žádné speciální role"
-        embed.add_field(name="🎖️ Role (v2.3)", value=roles_text, inline=False)
+        embed.add_field(name="🎖️ Role (v2.3.1)", value=roles_text, inline=False)
     
     embed.set_thumbnail(url=target.avatar.url if target.avatar else None)
     
     await interaction.response.send_message(embed=embed)
 
 # ═══════════════════════════════════════════════════════════════════════════════
-#                 13. V2.3 – GAME PRESENCE ENGINE 2.0
+#                 13. V2.3.1 – MULTI-SERVER THREAD-SAFETY
 # ═══════════════════════════════════════════════════════════════════════════════
 
 # Tracking hraných her
 game_activity = {}  # {user_id: {"games": {game_name: hours}, "last_update": timestamp}}
+                     # GLOBÁLNÍ data - sdílena mezi všemi servery (logické, user má stejné hry všude)
+guild_role_locks = {}  # {guild_id: asyncio.Lock} - zabránit race conditions při vytváření rolí
+
+def get_guild_role_lock(guild_id: int) -> asyncio.Lock:
+    """Vrátí lock pro guild - zabránit race conditions."""
+    if guild_id not in guild_role_locks:
+        guild_role_locks[guild_id] = asyncio.Lock()
+    return guild_role_locks[guild_id]
 
 def get_game_data(user_id: int):
     """Vrátí nebo vytvoří data hry pro uživatele."""
@@ -1630,20 +1716,20 @@ def track_user_activity(member: discord.Member):
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
-#                 15. V2.3 – GAME PRESENCE ENGINE 2.0
+#                 15. V2.3.1 – MULTI-SERVER THREAD-SAFETY
 # ═══════════════════════════════════════════════════════════════════════════════
 
 # Tracking hraných her
 
 async def assign_game_roles(member: discord.Member):
-    """Přiřaď role na základě her."""
+    """Přiřaď role na základě her - THREAD-SAFE s guild lock."""
     if member.bot:
         return
     
     guild = member.guild
     user_data = get_game_data(member.id)
     
-    # Najdi nebo vytvoř role
+    # Najdi nebo vytvoř role - s lockem aby se nekonfliktovaly
     role_names = {
         "gamer": "🎮 Gamer",
         "night_warrior": "🌙 Night Warrior",
@@ -1654,31 +1740,62 @@ async def assign_game_roles(member: discord.Member):
     total_hours = sum(user_data["games"].values())
     
     try:
-        # 🎮 Gamer role (1+ hodina hraní)
-        if total_hours >= 1:
-            role = discord.utils.get(guild.roles, name=role_names["gamer"])
-            if not role:
-                role = await guild.create_role(name=role_names["gamer"], color=discord.Color.blue())
-            if role not in member.roles:
-                await member.add_roles(role)
-        
-        # 🌙 Night Warrior role (hrajou po 23:00)
-        if member.activity and datetime.datetime.now().hour >= 23:
-            role = discord.utils.get(guild.roles, name=role_names["night_warrior"])
-            if not role:
-                role = await guild.create_role(name=role_names["night_warrior"], color=discord.Color.dark_gray())
-            if role not in member.roles:
-                await member.add_roles(role)
-        
-        # ⛪ Weekend Crusader role (hrajou o víkendu)
-        if member.activity and datetime.datetime.now().weekday() >= 5:
-            role = discord.utils.get(guild.roles, name=role_names["weekend_crusader"])
-            if not role:
-                role = await guild.create_role(name=role_names["weekend_crusader"], color=discord.Color.gold())
-            if role not in member.roles:
-                await member.add_roles(role)
+        # Použij lock pro guild - zabránit race conditions
+        async with get_guild_role_lock(guild.id):
+            # 🎮 Gamer role (1+ hodina hraní)
+            if total_hours >= 1:
+                role = discord.utils.get(guild.roles, name=role_names["gamer"])
+                if not role:
+                    try:
+                        role = await guild.create_role(name=role_names["gamer"], color=discord.Color.blue())
+                        print(f"[roles] Created 🎮 Gamer role in {guild.name}")
+                    except discord.Forbidden:
+                        print(f"[roles] ❌ No permission to create role in {guild.name}")
+                        return
+                    except Exception as e:
+                        print(f"[roles] Error creating role: {e}")
+                        return
+                
+                if role and role not in member.roles:
+                    try:
+                        await member.add_roles(role)
+                    except Exception as e:
+                        print(f"[roles] Error adding role: {e}")
+            
+            # 🌙 Night Warrior role (hrajou po 23:00)
+            if member.activity and datetime.datetime.now().hour >= 23:
+                role = discord.utils.get(guild.roles, name=role_names["night_warrior"])
+                if not role:
+                    try:
+                        role = await guild.create_role(name=role_names["night_warrior"], color=discord.Color.dark_gray())
+                        print(f"[roles] Created 🌙 Night Warrior role in {guild.name}")
+                    except Exception as e:
+                        print(f"[roles] Error creating Night Warrior role: {e}")
+                
+                if role and role not in member.roles:
+                    try:
+                        await member.add_roles(role)
+                    except Exception as e:
+                        print(f"[roles] Error adding Night Warrior role: {e}")
+            
+            # ⛪ Weekend Crusader role (hrajou o víkendu)
+            if member.activity and datetime.datetime.now().weekday() >= 5:
+                role = discord.utils.get(guild.roles, name=role_names["weekend_crusader"])
+                if not role:
+                    try:
+                        role = await guild.create_role(name=role_names["weekend_crusader"], color=discord.Color.gold())
+                        print(f"[roles] Created ⛪ Weekend Crusader role in {guild.name}")
+                    except Exception as e:
+                        print(f"[roles] Error creating Weekend Crusader role: {e}")
+                
+                if role and role not in member.roles:
+                    try:
+                        await member.add_roles(role)
+                    except Exception as e:
+                        print(f"[roles] Error adding Weekend Crusader role: {e}")
+    
     except Exception as e:
-        print(f"[v2.3] Error assigning roles: {e}")
+        print(f"[v2.3.1] Unexpected error in assign_game_roles: {e}")
 
 # ═══════════════════════════════════════════════════════════════════════════════
 #                   16. MAIN ENTRY POINT

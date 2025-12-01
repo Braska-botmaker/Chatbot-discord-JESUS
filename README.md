@@ -1,6 +1,6 @@
 # ✝️ Ježíš Discord Bot – hudba, verše a hry zdarma 🙏
 
-**Verze:** v2.3 – Game Presence Engine 2.0 | **Platform:** Raspberry Pi Ready
+**Verze:** v2.3.1 – Multi-Server Thread-Safety Patch | **Platform:** Raspberry Pi Ready
 
 Discord bot napsaný v Pythonu (discord.py), který umí:
 
@@ -170,7 +170,7 @@ Voice práva v cílovém kanálu:
 
 ---
 
-## ⌨️ Příkazy (Slash Commands – v2.3)
+## ⌨️ Příkazy (Slash Commands – v2.3.1)
 
 Hezký přehled najdete v `/komandy`. Základ:
 
@@ -194,12 +194,12 @@ Hezký přehled najdete v `/komandy`. Základ:
 * `/bless @uživatel` – krátké osobní požehnání
 * `/komandy` – kompletní seznam příkazů
 
-### Minihry & Hry (v2.3)
+### Minihry & Hry (v2.3.1)
 
 * `/biblickykviz` – biblický trivia systém s 10 otázkami
 * `/versfight @user` – veršový duel mezi hráči (hlasování, XP)
 * `/rollblessing` – RNG požehnání s cooldown 1 hodina
-* `/profile [@user]` – kompletní profil s XP, TOP 5 herami, rankingem a rolemi (v2.3)
+* `/profile [@user]` – kompletní profil s XP, TOP 5 herami, rankingem a rolemi (v2.3.1)
 
 
 ---
@@ -382,14 +382,25 @@ python3 tools/rpi_voice_diagnostics.py
 
 ## 🛣️ Roadmapa – Ježíš Discord Bot (v2.x → v3.x)
 
-### 🟩 v2.3 (AKTUÁLNÍ VERZE – Game Presence Engine 2.0)
+### 🟩 v2.3.1 (AKTUÁLNÍ VERZE – Multi-Server Thread-Safety Patch)
 
-Nyní aktivní! Pokročilé sledování a management her:
+Nyní aktivní! Stabilizace pro multi-server deployment:
+* ✅ **Nové v2.3.1**: Guild-level locks pro bezpečné vytváření rolí
+* ✅ **Nové v2.3.1**: Periodic game tracking se storage (každých 5 minut)
+* ✅ **Nové v2.3.1**: Real-time herní statistiky bez race conditions
 * ✅ Automatické sledování hraných her uživatelů
 * ✅ Personalizovaná požehnání podle hrané hry (54 her)
-* ✅ **Nové v2.3**: `/profile` s TOP 5 herami, server rankingem, role achievements
+* ✅ `/profile` s TOP 5 herami, server rankingem, role achievements
 * ✅ Auto-role: 🎮 Gamer, 🌙 Night Warrior, ⛪ Weekend Crusader
-* ✅ Hudba, verše, minihry z v2.2, presence tracking
+* ✅ Multi-server ready bez konflikty dat
+
+### 🟩 v2.3 (LEGACY – Game Presence Engine 2.0)
+
+Předchozí verze:
+* ✅ Automatické sledování hraných her uživatelů
+* ✅ Personalizovaná požehnání podle hrané hry (54 her)
+* ✅ `/profile` s TOP 5 herami, server rankingem, role achievements
+* ✅ Auto-role: 🎮 Gamer, 🌙 Night Warrior, ⛪ Weekend Crusader
 
 ### 🟩 v2.2.1 (LEGACY – Enhanced Queue Display)
 
@@ -426,12 +437,17 @@ Starší verze:
 
 
 
-## 🎮 v2.3 – Game Presence Engine 2.0 (HOTOVO ✅)
+## 🎮 v2.3.0 –  Game Presecne Engine 2.0 (HOTOVO)
+* ✅ Guild-level locks pro bezpečné vytváření rolí  
+* ✅ Periodic game tracking se storage (aktualizace každých 5 minut)  
+* ✅ Real-time herní statistiky bez race conditions  
 * ✅ Pokročilé sledování hraných her uživatelů  
 * ✅ Personalizovaná požehnání podle hrané hry (54 her)  
 * ✅ Server ranking a statistiky: TOP 5 her, celkový čas  
 * ✅ Auto-role: 🎮 Gamer (1+ hodina), 🌙 Night Warrior (23:00+), ⛪ Weekend Crusader (víkend)  
-* ✅ `/profile` integruje veškeré game presence data
+* ✅ `/profile` integruje veškeré game presence data  
+* ✅ Multi-server ready – bez konflikty dat a bezpečné pro >2 servery
+
 
 
 
