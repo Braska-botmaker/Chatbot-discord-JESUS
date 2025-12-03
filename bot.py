@@ -1351,7 +1351,7 @@ async def komandy_command(interaction: discord.Interaction):
 /komandy – Tohle
 """, inline=False)
         embed.add_field(name="🎮 Minihry & Hry (v2.4)", value="""
-/biblickykviz – Biblický trivia
+/biblickykviz – Biblické otázky za XP
 /versfight @user – Veršový duel
 /rollblessing – RNG požehnání
 /profile [@user] – Profil s XP, TOP 5 herami, rankingem, rolemi (v2.4)
