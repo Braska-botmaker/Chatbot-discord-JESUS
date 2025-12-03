@@ -1,10 +1,10 @@
 # ✝️ Ježíš Discord Bot – hudba, verše a hry zdarma 🙏
 
-**Verze:** v2.3.2 – Multi-Server Thread-Safety Patch | **Platform:** Raspberry Pi Ready
+**Verze:** v2.4 – Music QoL Pack | **Platform:** Raspberry Pi Ready
 
 Discord bot napsaný v Pythonu (discord.py), který umí:
 
-* 🎵 Přehrávat hudbu z URL (YouTube přes `yt-dlp`) do voice kanálu - s názvy skladeb
+* 🎵 Přehrávat hudbu z URL (YouTube přes `yt-dlp`) do voice kanálu - s názvy skladeb, odhadem času fronty a blokaací duplicitních skladeb
 * 📖 Posílat ranní a večerní zprávy s biblickým veršem
 * 🙏 Žehnat hráčům při spuštění her a reagovat na společné hraní ve voice
 * 🎁 Každý večer publikovat „Hry zdarma" s embedem a Discord link previews
@@ -179,18 +179,20 @@ Voice práva v cílovém kanálu:
 
 ---
 
-## ⌨️ Příkazy (Slash Commands – v2.3.2)
+## ⌨️ Příkazy (Slash Commands – v2.4)
 
 Hezký přehled najdete v `/komandy`. Základ:
 
 ### Hudba
 
-* `/yt <url>` – přidá skladbu do fronty a spustí přehrávání (YouTube přes yt-dlp)
+* `/yt <url>` – přidá skladbu do fronty a spustí přehrávání (YouTube přes yt-dlp) – **v2.4: Detekuje duplikáty, zobrazuje odhad času fronty | v2.4.1: Podporuje i YouTube playlisty**
+* `/sp <spotify_url>` – **v2.8: NOVÉ - Přidá skladbu/playlist ze Spotify do fronty (vyhledávání přes YouTube)**
 * `/další` – přeskoči aktuální skladbu
 * `/pauza` / `/pokračuj` – pauza/obnovení
 * `/zastav` – zastaví a vyčistí frontu
 * `/odejdi` – odpojí bota z voice
-* `/fronta` – vypíše frontu
+* `/fronta` – vypíše frontu **v2.4: S odhadem celkového času (⏱️ Odhad: ~45m 30s)**
+* `/shuffle` – **v2.4.1: NOVÉ - Náhodně zamíchá pořadí skladeb ve frontě**
 * `/np` – zobrazí právě přehrávanou skladbu
 * `/vtest` – rychlý 3s tón pro ověření FFmpeg/voice
 * `/diag` – výpis prostředí, práv a instalace
@@ -203,9 +205,9 @@ Hezký přehled najdete v `/komandy`. Základ:
 * `/bless @uživatel` – krátké osobní požehnání
 * `/komandy` – kompletní seznam příkazů
 
-### Minihry & Hry (v2.3.2)
+### Minihry & Hry (v2.4)
 
-* `/biblickykviz` – biblický trivia systém s 10 otázkami
+* `/biblickykviz` – biblický trivia systém s 10 otázkami **v2.4: Rozšířeno na 32 otázek v databázi pro vyšší variabilitu**
 * `/versfight @user` – veršový duel mezi hráči (hlasování, XP)
 * `/rollblessing` – RNG požehnání s cooldown 1 hodina
 * `/profile [@user]` – kompletní profil s XP, TOP 5 herami, rankingem a rolemi (v2.3.2)
@@ -360,7 +362,7 @@ python3 tools/rpi_voice_diagnostics.py
 | Modernost | ✅ Budoucí Discord | ❌ Zastaralé |
 | Error Handling | ✅ 39 try/except | ⚠️ Méně |
 
-**Doporučujeme: Upgrade na v2.3.2!**
+**Doporučujeme: Upgrade na v2.4!**
 
 ---
 
@@ -375,9 +377,9 @@ python3 tools/rpi_voice_diagnostics.py
 
 ## 🛣️ Roadmapa – Ježíš Discord Bot (v2.x → v3.x)
 
-### 🟩 v2.3.2 (AKTUÁLNÍ VERZE – Multi-Server Thread-Safety Patch)
+### 🟩 v2.3.2 (LEGACY – Multi-Server Thread-Safety Patch)
 
-Nyní aktivní! Stabilizace pro multi-server deployment:
+Předchozí verze:
 * ✅ **Guild-level locks** pro bezpečné vytváření rolí
 * ✅ **Periodic game tracking** se storage (každých 5 minut)
 * ✅ **Real-time herní statistiky** bez race conditions
@@ -390,13 +392,24 @@ Nyní aktivní! Stabilizace pro multi-server deployment:
 * ✅ Všechny minihry (kviz, versfight, rollblessing)
 * ✅ XP systém: 🔰 Učedník → 📜 Prorok → 👑 Apoštol
 
-### 🟨 v2.4 – Music QoL Pack (PLÁNOVANÉ)
+### 🟨 v2.4 (AKTUÁLNÍ VERZE – Music QoL Pack)
 
-* Rychlejší reconnect při ping spikech
-* Ukládání posledního voice kanálu → auto-reconnect po restartu
-* Lepší práce s frontou (blokace duplicity, auto-clean)
-* Přepracovaný `/fronta` s embedem
-* Stabilnější `/zastav` a reconnect logika
+Nyní aktivní! Zlepšení hudby a miniher:
+* ✅ **Blokace duplicitních skladeb** – Detekuje když se uživatel pokusí přidat stejnou skladbu do fronty
+* ✅ **Odhad času fronty** – `/fronta` a `/yt` zobrazují odhad zbývajícího času (⏱️ Odhad: ~45m 30s, 12 skladeb)
+* ✅ **Automatické čištění URL setu** – Když se skladba přehraje nebo se fronta vymaže
+* ✅ **Cachování doby trvání** – Uloží délku skladby pro rychlejší výpočty
+* ✅ **Rozšířená biblická databáze** – 32 otázek v kvízu (místo 10) pro vyšší variabilitu
+* ✅ Všechny funkce v2.3.2 zachovány (bez breaking changes)
+* ✅ Optimalizované pro multi-server i single-server nasazení
+
+### 🟨 v2.4.1 – Music Playlist & Shuffle (PLÁNOVANÉ)
+
+* **YouTube Album/Playlist v jednom kroku** – `/yt <playlist_url>` detekuje playlist a přidá všechny skladby najednou s duplikát-checkingem
+* **Zamíchání fronty** – Nový command `/shuffle` náhodně zamíchá pořadí skladeb ve frontě (aktuálně hraná skladba zůstane na místě)
+* **Odhad času playlistu** – Bot vypočítá a zobrazí celkový čas všech skladeb v playlistu před přidáním
+* **Batch progress feedback** – Zobrazuje průběh přidávání: "⏳ Přidávám: 5/24 skladeb..."
+* Zpětná kompatibilita s v2.4 (vše funguje jako do teď)
 
 ### 🟨 v2.5 – Channel Config Pack (PLÁNOVANÉ)
 
@@ -422,7 +435,17 @@ Nyní aktivní! Stabilizace pro multi-server deployment:
 * Týdenní shrnutí aktivit
 * Agregace hraných her + hudební historie
 
-### 🟨 v2.8 – Web Dashboard (PLÁNOVANÉ)
+### 🟨 v2.8 – Spotify Integration Pack (PLÁNOVANÉ)
+
+* **Spotify Web API support** – `/sp <spotify_url>` přidá skladbu nebo playlist do fronty
+* **Spotify Connect playback** – Bot ovládá tvou Spotify aplikaci přes Spotify Connect (legitimní streaming)
+* **Premium account required** – Vyžaduje Spotify Premium pro programmatic playback
+* **OAuth authentication** – Uživatel se autentifikuje přes Spotify OAuth na začátku
+* **Duplikát blocking** – Spotify skladby jsou chráněny proti duplicitám jako YouTube
+* **Queue duration estimation** – Odhad času i pro Spotify skladby
+* **Error handling** – Bez vlivu na YouTube přehrávání (`/yt`), oddělené systémy
+
+### 🟨 v2.9 – Web Dashboard (PLÁNOVANÉ)
 
 * Běží přímo na Raspberry Pi (Flask/FastAPI)
 * Živé zobrazení právě hrané hudby

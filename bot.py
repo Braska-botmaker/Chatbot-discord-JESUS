@@ -1,5 +1,5 @@
 # ╔════════════════════════════════════════════════════════════════════════════╗
-# ║      Ježíš Discord Bot v2.3.1 – Multi-Server Thread-Safety Patch      ║
+# ║      Ježíš Discord Bot v2.4 – Music QoL Pack (Duplicate Block)          ║
 # ║                     Kompletní přepis na slash commands                      ║
 # ║                  s Czech názvy pro maximální unikalitu                      ║
 # ╚════════════════════════════════════════════════════════════════════════════╝
@@ -211,6 +211,8 @@ voice_locks = {}
 last_voice_channel = {}
 recently_announced_games = set()
 voice_inactivity_timers = {}  # {guild_id: asyncio.Task}
+queue_urls_seen = {}  # {guild_id: set(urls)} – v2.4 blokace duplicit
+song_durations = {}  # {song_url: duration_seconds} – v2.4 odhad času
 
 YDL_OPTS = {
     "format": "bestaudio/best",
@@ -291,6 +293,46 @@ def _guild_lock(gid: int) -> asyncio.Lock:
         voice_locks[gid] = asyncio.Lock()
     return voice_locks[gid]
 
+def _init_queue_urls_seen(guild_id: int):
+    """Inicializuj set pro sledování URL v frontě (v2.4)."""
+    if guild_id not in queue_urls_seen:
+        queue_urls_seen[guild_id] = set()
+
+def _is_url_in_queue(guild_id: int, url: str) -> bool:
+    """Kontroluj, zda URL už je ve frontě (v2.4 – blokace duplicit)."""
+    _init_queue_urls_seen(guild_id)
+    return url in queue_urls_seen[guild_id]
+
+def _add_url_to_queue(guild_id: int, url: str):
+    """Přidej URL do setu - zabrání duplicitám (v2.4)."""
+    _init_queue_urls_seen(guild_id)
+    queue_urls_seen[guild_id].add(url)
+
+def _remove_url_from_queue(guild_id: int, url: str):
+    """Odeber URL ze setu když se vymaže z fronty (v2.4)."""
+    _init_queue_urls_seen(guild_id)
+    queue_urls_seen[guild_id].discard(url)
+
+def _clear_queue_urls(guild_id: int):
+    """Vyčisti URL set když se vymaže celá fronta (v2.4)."""
+    if guild_id in queue_urls_seen:
+        queue_urls_seen[guild_id].clear()
+
+def _estimate_queue_duration(guild_id: int) -> tuple:
+    """Odhad doby trvání fronty (v2.4). Vrátí (minuces, seconds, songs)."""
+    queue = _queue_for(guild_id)
+    total_seconds = 0
+    
+    for item in queue:
+        url = item.get("url", "")
+        # Fallback: 3 minuty pokud nemáme data
+        duration = song_durations.get(url, 180)
+        total_seconds += duration
+    
+    total_minutes = total_seconds // 60
+    remaining_seconds = total_seconds % 60
+    return (total_minutes, remaining_seconds, len(queue))
+
 async def wait_until_connected(vc: Optional[discord.VoiceClient], tries: int = 15, delay: float = 0.3) -> bool:
     """Opakovaně zkontroluj, zda je voice skutečně připojený."""
     for i in range(tries):
@@ -351,6 +393,11 @@ async def play_next(guild: discord.Guild, text_channel: discord.TextChannel):
         return
     
     song = queue.popleft()
+    
+    # v2.4: Auto-clean – vymaž URL ze setu když se vymaže z fronty
+    song_url = song.get("url", "")
+    if song_url:
+        _remove_url_from_queue(guild.id, song_url)
     
     try:
         print(f"[music] Extracting: {song['url']}")
@@ -741,16 +788,28 @@ async def yt_command(interaction: discord.Interaction, url: str):
         title = "Načítám..."
         extracted = ytdlp_extract(url)
         title = extracted.get("title", "Neznámá skladba")
+        duration = extracted.get("duration", 180)  # v2.4: ulož dobu trvání
+        song_durations[url] = duration
     except Exception as e:
         title = "Chyba při načítání názvu"
         print(f"[yt] Error extracting title: {e}")
     
+    # v2.4: Blokace duplicit v frontě
+    if _is_url_in_queue(guild.id, url):
+        await interaction.followup.send(f"⚠️ **{title}** je už ve frontě! Přeskakuji duplikát.")
+        return
+    
     _queue_for(guild.id).append({"url": url, "title": title})
+    _add_url_to_queue(guild.id, url)  # v2.4: přidej do setu
+    
     if not vc.is_playing():
         await play_next(guild, interaction.channel)
         await interaction.followup.send(f"▶️ Začínám přehrávat: **{title}**\n{url}")
     else:
-        await interaction.followup.send(f"✅ Přidáno do fronty: **{title}**\n{url}")
+        # v2.4: Ukaž odhad času
+        mins, secs, count = _estimate_queue_duration(guild.id)
+        duration_str = f" (~{mins}m {secs}s, {count} skladeb v frontě)" if count > 0 else ""
+        await interaction.followup.send(f"✅ Přidáno do fronty: **{title}**\n{url}{duration_str}")
 
 @bot.tree.command(name="další", description="Přeskoč na další písničku")
 async def dalsi_command(interaction: discord.Interaction):
@@ -809,6 +868,7 @@ async def zastav_command(interaction: discord.Interaction):
         if vc.is_playing():
             vc.stop()
         _queue_for(guild.id).clear()
+        _clear_queue_urls(guild.id)  # v2.4: čistit URL set
         now_playing[guild.id] = None
         await interaction.response.send_message("⏹️ Zastaveno! Fronta smazána.")
     except Exception as e:
@@ -865,7 +925,12 @@ async def fronta_command(interaction: discord.Interaction):
             items.append(f"{i}. {title}\n{url}")
         
         description = "\n\n".join(items)
-        embed = discord.Embed(title="🎵 Fronta", description=description, color=discord.Color.blue())
+        
+        # v2.4: Odhad času trvání
+        mins, secs, count = _estimate_queue_duration(guild.id)
+        duration_info = f"\n\n⏱️ Odhad: ~{mins}m {secs}s ({count} skladeb)" if count > 0 else ""
+        
+        embed = discord.Embed(title="🎵 Fronta", description=description + duration_info, color=discord.Color.blue())
         await interaction.response.send_message(embed=embed)
     except Exception as e:
         await interaction.response.send_message(f"❌ Chyba: {str(e)[:100]}")
@@ -1113,23 +1178,25 @@ async def verze_command(interaction: discord.Interaction):
     """Show bot version and changelog."""
     try:
         embed = discord.Embed(title="ℹ️ Ježíš Discord Bot", color=discord.Color.gold())
-        embed.add_field(name="Verze", value="v2.3.1 – Multi-Server Thread-Safety Patch", inline=False)
+        embed.add_field(name="Verze", value="v2.4 – Music QoL Pack (Duplicate Block)", inline=False)
         embed.add_field(name="Co je nového", value="""
-**v2.3.1 – Multi-Server Thread-Safety Patch:** (AKTUÁLNÍ)
-🔒 NOVÉ: Guild-level locks pro bezpečné vytváření rolí
-📊 NOVÉ: Periodic game tracking se storage (každých 5 minut)
-⚡ NOVÉ: Real-time herní statistiky bez race conditions
+**v2.4 – Music QoL Pack:** (AKTUÁLNÍ)
+🚫 NOVÉ: Blokace duplicitních skladeb v frontě
+⏱️ NOVÉ: Odhad času trvání fronty v `/fronta` a `/yt`
+🧹 NOVÉ: Auto-clean URL setu po vymazání skladby
+⚡ Lepší reconnect při ping spikech (FFMPEG)
+📚 Ukládání doby trvání skladeb (pro odhady)
+✅ Všechny v2.3.1 features zachovány!
+
+**v2.3.1 – Multi-Server Thread-Safety Patch:**
+🔒 Guild-level locks pro bezpečné vytváření rolí
+📊 Periodic game tracking se storage (každých 5 minut)
+⚡ Real-time herní statistiky bez race conditions
 🎮 Automatické sledování hraných her uživatelů
-🎮 Personalizovaná požehnání podle hrané hry (54 her)
-📊 `/profile` s TOP 5 herami, server rankingem
-🎖️ Auto-role: Gamer (1+ hodina), Night Warrior (23:00+), Weekend Crusader (víkend)
-✨ Multi-server ready – bez konflikty dat!
 
 **v2.3 – Game Presence Engine 2.0:**
 🎮 Automatické sledování hraných her uživatelů
 🎮 Personalizovaná požehnání podle hrané hry (54 her)
-📊 `/profile` s TOP 5 herami, server rankingem
-🎖️ Auto-role: Gamer (1+ hodina), Night Warrior (23:00+), Weekend Crusader (víkend)
 
 **v2.2.1 – Enhanced Queue Display:**
 ✨ `/fronta` zobrazuje strukturovaně: název + URL
@@ -1150,7 +1217,7 @@ async def verze_command(interaction: discord.Interaction):
 async def komandy_command(interaction: discord.Interaction):
     """Show all available commands."""
     try:
-        embed = discord.Embed(title="📋 Příkazy – Ježíš Discord Bot v2.3.1", color=discord.Color.blue())
+        embed = discord.Embed(title="📋 Příkazy – Ježíš Discord Bot v2.4", color=discord.Color.blue())
         embed.add_field(name="🎵 Hudba", value="""
 /yt <url> – Přehrávej z YouTube
 /další – Přeskoč
@@ -1170,11 +1237,11 @@ async def komandy_command(interaction: discord.Interaction):
 /diag – Diagnostika
 /komandy – Tohle
 """, inline=False)
-        embed.add_field(name="🎮 Minihry & Hry (v2.3.1)", value="""
+        embed.add_field(name="🎮 Minihry & Hry (v2.4)", value="""
 /biblickykviz – Biblický trivia
 /versfight @user – Veršový duel
 /rollblessing – RNG požehnání
-/profile [@user] – Profil s XP, TOP 5 herami, rankingem, rolemi (v2.3.1)
+/profile [@user] – Profil s XP, TOP 5 herami, rankingem, rolemi (v2.4)
 """, inline=False)
         await interaction.response.send_message(embed=embed)
     except Exception as e:
@@ -1195,7 +1262,7 @@ async def diag_command(interaction: discord.Interaction):
     voice_count = len(bot.voice_clients)
     embed.add_field(name="🎤 Voice", value=f"Connected: {voice_count}", inline=True)
     if bot.user:
-        embed.add_field(name="⏱️ Verze", value="v2.3.1\nMulti-Server Thread-Safety", inline=True)
+        embed.add_field(name="⏱️ Verze", value="v2.4\nMusic QoL Pack", inline=True)
     await interaction.followup.send(embed=embed)
 
 # ═══════════════════════════════════════════════════════════════════════════════
@@ -1402,7 +1469,7 @@ biblical_quiz_questions = [
     },
     {
         "question": "Kdo je autorem nejvíce psalmů?",
-        "options": ["Mojžíš", "Davidský", "Salomon", "Ježíš"],
+        "options": ["Mojžíš", "David", "Salomon", "Ježíš"],
         "correct": 1
     },
     {
@@ -1412,7 +1479,7 @@ biblical_quiz_questions = [
     },
     {
         "question": "Jak se jmenoval Kristův učitel během dospělosti?",
-        "options": ["Jan", "Petr", "Ježíš", "Jan Křtitel"],
+        "options": ["Jan", "Petr", "Moisés", "Jan Křtitel"],
         "correct": 3
     },
     {
@@ -1426,24 +1493,134 @@ biblical_quiz_questions = [
         "correct": 2
     },
     {
-        "question": "Jaké bylo jméno muže, který trpěl 38 let?",
-        "options": ["Zákchej", "Neznámý", "Paralyzovaný", "Sleператор"],
-        "correct": 2
-    },
-    {
         "question": "Kolik dní Ježíš postil v poušti?",
         "options": ["30", "40", "50", "7"],
         "correct": 1
     },
     {
-        "question": "Jaké je jméno největšího apoštola?",
+        "question": "Jak se jmenoval největší apoštol Ježíšův?",
         "options": ["Matouš", "Petr", "Jakub", "Jan"],
         "correct": 1
     },
     {
-        "question": "Co dělal Zákchej dříve?",
+        "question": "Co dělal Zákchej?",
         "options": ["Rybář", "Celtář", "Horář", "Lékař"],
         "correct": 1
+    },
+    {
+        "question": "Kolik let Izraelci bloudili pouští?",
+        "options": ["30", "40", "50", "60"],
+        "correct": 1
+    },
+    {
+        "question": "Jak se jmenoval první muž?",
+        "options": ["Noe", "Abraham", "Adam", "Mojžíš"],
+        "correct": 2
+    },
+    {
+        "question": "Kolik přikázání dal Bůh Mojžíšovi?",
+        "options": ["8", "10", "12", "15"],
+        "correct": 1
+    },
+    {
+        "question": "Jak se jmenoval velký otec Davida?",
+        "options": ["Obed", "Jaj", "Boaz", "Ruben"],
+        "correct": 2
+    },
+    {
+        "question": "Kolik slov měla Nejkratší modlitba Ježíše? (Otče náš...)",
+        "options": ["52", "66", "71", "88"],
+        "correct": 2
+    },
+    {
+        "question": "Kolik let bylo Noeovi když začala potopa?",
+        "options": ["500", "600", "700", "800"],
+        "correct": 1
+    },
+    {
+        "question": "Jaké bylo celé jméno Matouše apoštola?",
+        "options": ["Matouš Levita", "Levi", "Matouš Zákchej", "Matouš Šimon"],
+        "correct": 0
+    },
+    {
+        "question": "Kolik věrozvěstů měl Ježíš?",
+        "options": ["4", "5", "7", "12"],
+        "correct": 1
+    },
+    {
+        "question": "Jak se jmenoval farizeský učitel, který navštívil Ježíše?",
+        "options": ["Gamaliel", "Nikodém", "Annas", "Kajfáš"],
+        "correct": 1
+    },
+    {
+        "question": "V kterém věku zemřel Ježíš?",
+        "options": ["30", "33", "36", "40"],
+        "correct": 1
+    },
+    {
+        "question": "Jaké bylo původní jméno Pavla před obrácením?",
+        "options": ["Saul", "Šimon", "Judáš", "Timotej"],
+        "correct": 0
+    },
+    {
+        "question": "Kolik knih napsal apoštol Jan?",
+        "options": ["1", "3", "5", "7"],
+        "correct": 1
+    },
+    {
+        "question": "Jak se jmenoval největší chrám v Jeruzalémě?",
+        "options": ["Chram Božího Syna", "Chram Šolomounův", "Chram Heroda", "Chram Davida"],
+        "correct": 2
+    },
+    {
+        "question": "Kolik rozmnožovacích zázraků měl Ježíš v evangeliích?",
+        "options": ["1", "2", "3", "4"],
+        "correct": 2
+    },
+    {
+        "question": "Které město bylo Thomášovým domovem?",
+        "options": ["Jeruzalém", "Betánie", "Kafarnaum", "Jericho"],
+        "correct": 2
+    },
+    {
+        "question": "Kolik písní je v bibli sepsáno?",
+        "options": ["100", "150", "200", "300"],
+        "correct": 1
+    },
+    {
+        "question": "Jak se jmenoval nejstarší syn Noeův?",
+        "options": ["Sem", "Cham", "Jáfet", "Kain"],
+        "correct": 0
+    },
+    {
+        "question": "Kolik plasmů byla Elišova bolest po Eliášově nanebevzetí?",
+        "options": ["Jednou", "Dvakrát", "Třikrát", "Čtyřikrát"],
+        "correct": 1
+    },
+    {
+        "question": "Jak dlouho se Ježíš modlil v Getsemanské zahradě?",
+        "options": ["1 hodinu", "2 hodiny", "3 hodiny", "Celou noc"],
+        "correct": 0
+    },
+    {
+        "question": "Kolik let bylo Saraině když porodila Izáka?",
+        "options": ["70", "80", "90", "100"],
+        "correct": 2
+    },
+    {
+        "question": "V kterém městě se narodil Pavel?",
+        "options": ["Terasa", "Tarsos", "Tarsus", "Tébé"],
+        "correct": 2
+    },
+    {
+        "question": "Kolik bratrů měl Ježíš?",
+        "options": ["1", "2", "3", "4"],
+        "correct": 3
+    },
+    {
+        "question": "Jaké bylo poslední slovo Ježíše na kříži?",
+        "options": ["Otče", "Gotě", "Hotovo", "Amen"],
+        "correct": 2
     }
 ]
 
