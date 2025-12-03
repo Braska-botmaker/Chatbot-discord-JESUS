@@ -640,11 +640,54 @@ async def on_ready():
     """Bot startup event – synchronizuj slash commands a spusť scheduled tasks."""
     print(f"✅ Bot je přihlášen jako {bot.user}")
     
+    # 🔧 Inicializuj prázdný JSON pokud neexistuje (bezpečnost)
+    db = _load_data()
+    if not db:
+        db = {"verse_streak": {}, "game_activity": {}, "user_xp": {}}
+        await _save_data(db)
+        print("[init] ✅ Vytvořen nový bot_data.json")
+    
     # Načti verse streak z storage
     await load_verse_streak_from_storage()
     
     # Načti game activity z storage
     await load_game_activity_from_storage()
+    
+    # Načti user XP z storage
+    await load_user_xp_from_storage()
+    
+    # 🔧 FIX v2.3.1: Validuj XP data - pokud jsou anomální, resetuj
+    # (ochrana proti poškozením dat z budoucích bugů)
+    xp_reset_needed = False
+    for user_id, xp_data in list(user_xp.items()):
+        xp_value = xp_data.get("xp", 0)
+        # Pokud má někdo > 100 000 XP (nemožné - to by byla 6667 vítězství v versfight)
+        if xp_value > 100000:
+            print(f"[xp-fix] Anomální XP: user {user_id} má {xp_value} XP. Resetuji...")
+            xp_reset_needed = True
+            break
+    
+    if xp_reset_needed:
+        user_xp.clear()
+        await save_user_xp_to_storage()
+        print("[xp-fix] ✅ user_xp resetován (anomální data)")
+    
+    # 🔧 FIX v2.3.1: Detekuj a resetuj anomální game hours (bug byla multipliciter počítání)
+    # Pokud existují hry s >24h (anomální - game ještě není na serveru den), reset
+    reset_needed = False
+    for user_id, user_data in list(game_activity.items()):
+        for game_name, hours in user_data.get("games", {}).items():
+            if hours > 24:  # Anomální vysoká čísla
+                print(f"[bug-fix] Detekován bug: {game_name} má {hours:.1f}h (anomální). Resetuji game_activity...")
+                reset_needed = True
+                break
+        if reset_needed:
+            break
+    
+    if reset_needed:
+        game_activity.clear()
+        await save_game_activity_to_storage()
+        print("[bug-fix] ✅ game_activity resetován. Verse streak zachován.")
     
     try:
         synced = await bot.tree.sync()
@@ -942,6 +985,38 @@ async def save_game_activity_to_storage():
     except Exception as e:
         print(f"[game_activity] Failed to save: {e}")
 
+async def load_user_xp_from_storage():
+    """Načti user XP z persistent storage (bot_data.json)."""
+    global user_xp
+    try:
+        db = _load_data()
+        if "user_xp" in db:
+            xp_data = db["user_xp"]
+            for user_id_str, data in xp_data.items():
+                user_id = int(user_id_str)
+                user_xp[user_id] = {
+                    "xp": data.get("xp", 0),
+                    "level": data.get("level", "🔰 Učedník")
+                }
+            print(f"[xp] Loaded XP for {len(user_xp)} users")
+    except Exception as e:
+        print(f"[xp] Failed to load XP: {e}")
+
+async def save_user_xp_to_storage():
+    """Ulož user XP do persistent storage (bot_data.json)."""
+    try:
+        db = _load_data()
+        xp_data = {}
+        for user_id, data in user_xp.items():
+            xp_data[str(user_id)] = {
+                "xp": data.get("xp", 0),
+                "level": data.get("level", "🔰 Učedník")
+            }
+        db["user_xp"] = xp_data
+        await _save_data(db)
+    except Exception as e:
+        print(f"[xp] Failed to save XP: {e}")
+
 @bot.tree.command(name="verse", description="Random biblický verš")
 async def verse_command(interaction: discord.Interaction):
     """Send random Bible verse with daily streak tracking."""
@@ -1142,6 +1217,9 @@ async def track_game_activity_periodic():
         
         # Ulož data do storage po každém updatu
         await save_game_activity_to_storage()
+        
+        # Ulož také XP data (bezpečnost - nechceme ztratit XP pokud se bot spadne)
+        await save_user_xp_to_storage()
     except Exception as e:
         print(f"[track_periodic] Error: {e}")
 
@@ -1270,15 +1348,15 @@ async def on_presence_update(before, after):
     before_game = next((a for a in before.activities if is_game_activity(a)), None)
     after_game = next((a for a in after.activities if is_game_activity(a)), None)
 
-    # V2.3.1 TRACKING: Zaznamenej hry
-    if after_game:
-        track_user_activity(after)
-        await assign_game_roles(after)
-
     # Hra začala
     if before_game is None and after_game is not None:
         game_name = after_game.name
         print(f"[presence] {after.name} started playing: {game_name}")
+        
+        # V2.3.1 TRACKING: Zaznamenej hry JEN když hra ZAČNE (reset_on_new_game=True!)
+        # Tímto způsobem resetujeme last_update a NEpočítáme čas od staré aktualizace
+        track_user_activity(after, reset_on_new_game=True)
+        await assign_game_roles(after)
         
         # Vyber blessing
         if game_name in game_blessings:
@@ -1469,6 +1547,9 @@ async def biblickykviz_command(interaction: discord.Interaction):
     user_xp[user_id]["xp"] += xp_gain
     user_xp[user_id]["level"] = get_user_level(user_xp[user_id]["xp"])
     
+    # Ulož XP do storage
+    await save_user_xp_to_storage()
+    
     result_embed = discord.Embed(
         title="🎉 Výsledky Kvizu",
         description=f"**Skóre:** {score}/10\n**XP:** +{xp_gain}\n**Celkem XP:** {user_xp[user_id]['xp']}\n**Level:** {user_xp[user_id]['level']}",
@@ -1525,6 +1606,9 @@ async def versfight_command(interaction: discord.Interaction, opponent: discord.
             xp_gain = 50
             user_xp[winner.id]["xp"] += xp_gain
             user_xp[winner.id]["level"] = get_user_level(user_xp[winner.id]["xp"])
+            
+            # Ulož XP do storage
+            await save_user_xp_to_storage()
             
             result = discord.Embed(
                 title="🏆 Vítěz!",
@@ -1619,7 +1703,7 @@ async def profile_command(interaction: discord.Interaction, user: discord.User =
     
     games_text = ""
     if top_5:
-        games_text = "\n".join([f"🎮 **{game}**: {hours:.1f}h" for game, hours in top_5])
+        games_text = "\n".join([f"• **{game}**: {hours:.1f}h" for game, hours in top_5])
     else:
         games_text = "Zatím žádné hry nejsou zaznamenány."
     
@@ -1696,8 +1780,13 @@ def get_game_data(user_id: int):
         game_activity[user_id] = {"games": {}, "last_update": datetime.datetime.now()}
     return game_activity[user_id]
 
-def track_user_activity(member: discord.Member):
-    """Sleduj hry které člen hraje."""
+def track_user_activity(member: discord.Member, reset_on_new_game: bool = False):
+    """Sleduj hry které člen hraje.
+    
+    Args:
+        member: Discord member object
+        reset_on_new_game: Pokud True, resetne last_update (používá se když hra ZAČNE)
+    """
     if not member.activity or member.activity.type != discord.ActivityType.playing:
         return
     
@@ -1707,11 +1796,15 @@ def track_user_activity(member: discord.Member):
     if game_name not in user_data["games"]:
         user_data["games"][game_name] = 0
     
-    # Přidej čas hraní
+    # Přidej čas hraní (pokud to není nová hra)
     now = datetime.datetime.now()
-    last_update = user_data["last_update"]
-    time_delta = (now - last_update).total_seconds() / 3600
-    user_data["games"][game_name] += time_delta
+    if not reset_on_new_game:
+        # Normální tracking - přičti čas od poslední aktualizace
+        last_update = user_data["last_update"]
+        time_delta = (now - last_update).total_seconds() / 3600
+        user_data["games"][game_name] += time_delta
+    
+    # Aktualizuj last_update na teď (bez ohledu na reset_on_new_game)
     user_data["last_update"] = now
 
 

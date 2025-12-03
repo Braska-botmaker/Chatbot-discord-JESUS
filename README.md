@@ -1,6 +1,6 @@
 # ✝️ Ježíš Discord Bot – hudba, verše a hry zdarma 🙏
 
-**Verze:** v2.3.1 – Multi-Server Thread-Safety Patch | **Platform:** Raspberry Pi Ready
+**Verze:** v2.3.2 – Multi-Server Thread-Safety Patch | **Platform:** Raspberry Pi Ready
 
 Discord bot napsaný v Pythonu (discord.py), který umí:
 
@@ -27,10 +27,12 @@ Discord bot napsaný v Pythonu (discord.py), který umí:
 * [Plánované úlohy (cron-like)](#-plánované-úlohy-cron-like)
 * [Běh na Raspberry Pi jako služba (systemd)](#-běh-na-raspberry-pi-jako-služba-systemd)
 * [Diagnostika a řešení problémů](#-diagnostika-a-řešení-problémů)
-* [Poznámky k hudbě a streamování](#-poznámky-k-hudbě-a-streamování)
+* [Poznámky k Slash Commands](#-poznámky-k-slash-commands)
 * [Přizpůsobení](#-přizpůsobení)
 * [Roadmapa](#-roadmapa)
 * [Licence](#-licence)
+
+---
 
 ## ⚡ Rychlý start (5 minut)
 
@@ -48,12 +50,15 @@ Po přihlášení bota vidíte `/` v Discord chatu. Veškeré příkazy jsou **s
 /komandy – Kompletní seznam
 ```
 
-**Žádné prefix commands!** V2.1.5 používá pouze `/` (app_commands) pro modernost a bezpečnost.
+**Žádné prefix commands!** V2.3.2 používá pouze `/` (app_commands) pro modernost a bezpečnost.
+
+---
+
+## ⚙️ Požadavky
 
 * **Python 3.10+**
 * **FFmpeg** (pro přehrávání do voice)
 * Knihovny:
-
   * `discord.py`
   * `python-dotenv`
   * `yt-dlp`
@@ -84,6 +89,10 @@ sudo apt install -y ffmpeg libopus0 python3-venv
 - **docs/ČTĚME_NEJDŘÍV.md** – Úvod pro nové uživatele
 - **privacy-policy.md** – Ochrana osobních údajů
 - **terms-of-service.md** – Podmínky služby
+
+---
+
+## 📥 Instalace
 
 ### Automatická instalace
 
@@ -133,7 +142,7 @@ pip install -r config/requirements.txt
 
 ## ⚙️ Konfigurace (.env)
 
-V kořeni projektu vytvořte soubor `.env` (vzor: `config/.env.example`):
+V kořeni projektu vytvořte soubor `.env`:
 
 ```env
 DISCORD_TOKEN=PASTE_VAS_TOKEN_SEM
@@ -170,13 +179,13 @@ Voice práva v cílovém kanálu:
 
 ---
 
-## ⌨️ Příkazy (Slash Commands – v2.3.1)
+## ⌨️ Příkazy (Slash Commands – v2.3.2)
 
 Hezký přehled najdete v `/komandy`. Základ:
 
 ### Hudba
 
-* `/yt <url>` – přidá skladbu do fronty a spustí přehrávání (YouTube přes yt‑dlp)
+* `/yt <url>` – přidá skladbu do fronty a spustí přehrávání (YouTube přes yt-dlp)
 * `/další` – přeskoči aktuální skladbu
 * `/pauza` / `/pokračuj` – pauza/obnovení
 * `/zastav` – zastaví a vyčistí frontu
@@ -194,21 +203,20 @@ Hezký přehled najdete v `/komandy`. Základ:
 * `/bless @uživatel` – krátké osobní požehnání
 * `/komandy` – kompletní seznam příkazů
 
-### Minihry & Hry (v2.3.1)
+### Minihry & Hry (v2.3.2)
 
 * `/biblickykviz` – biblický trivia systém s 10 otázkami
 * `/versfight @user` – veršový duel mezi hráči (hlasování, XP)
 * `/rollblessing` – RNG požehnání s cooldown 1 hodina
-* `/profile [@user]` – kompletní profil s XP, TOP 5 herami, rankingem a rolemi (v2.3.1)
-
+* `/profile [@user]` – kompletní profil s XP, TOP 5 herami, rankingem a rolemi (v2.3.2)
 
 ---
 
 ## ⏰ Plánované úlohy (cron-like)
 
-* **Ráno 07:00 (CET)**: biblický verš do `požehnání🙏`
-* **Večer 20:00 (CET)**: „Dobrou noc…“
-* **Večer 20:10 (CET)**: „Hry zdarma“ do `hry_zdarma💵`
+* **Ráno 09:00 (CET)**: biblický verš do `požehnání🙏`
+* **Večer 22:00 (CET)**: „Dobrou noc…"
+* **Večer 20:10 (CET)**: „Hry zdarma" do `hry_zdarma💵`
 
 > Časy jsou v **Europe/Prague**. Můžete je změnit v definicích `tasks.loop`.
 
@@ -268,7 +276,7 @@ journalctl -u discordbot -f
 ### Slash Command selhal – "Interaction Failed"
 
 * Příčina: Bot nemá čas odpovědět do 3 sekund (timeout Discord API)
-* V2.1.0 to řeší: všechny commands mají `await interaction.response.defer()` nebo `send_message()`
+* V2.3.2 to řeší: všechny commands mají `await interaction.response.defer()` nebo `send_message()`
 * Pokud pořád selhává: zkontroluj logy bota (`journalctl -u discordbot -f`)
 
 ### 🔧 Diagnostické nástroje
@@ -283,25 +291,11 @@ python3 tools/rpi_voice_diagnostics.py
 /diag
 ```
 
-### ⚡ NOVÁ OPRAVA (v2.1.5) – Scheduled Tasks + Epic Games Fix
-
-**Co se změnilo oproti v2.1.4:**
-* ✅ **Opravy Scheduled Tasks** – "Dobré ráno" a "Dobrou noc" nyní fungují
-* ✅ **Epic Games API Fix** – `/freegamesjo` (přeejmenováno) a automatické odeslání her
-* ✅ **Robust Error Handling** – komplexní parsování dat s fallbacky
-* ✅ **Debug Logging** – lépe vidít, co se děje v logů
-* ✅ **Precision Timing** – tasks běží každé minuty a kontrolují přesný čas
-
-**Proč upgrade?**
-- Automatické zprávy nyní funkčují spolehlivě
-- Epic Games API stávové chyby jsou vyřešeny
-- Lepší viditelnost do problémů přes logging
-
 ---
 
 ### 1) „FFmpeg test selhal: ClientException: Not connected to voice"
 
-* Zkontrolujte, že jste v **tom samém voice kanálu** jako bot při `!vtest`/`!play`.
+* Zkontrolujte, že jste v **tom samém voice kanálu** jako bot při `/vtest`.
 * Ověřte práva kanálu: **Connect** a **Speak**.
 * Na *Stage* kanálu udělte botovi *Invite to Speak*.
 * Zkuste jiný voice kanál (někdy pomůže změna regionu/latence).
@@ -316,7 +310,7 @@ python3 tools/rpi_voice_diagnostics.py
   .venv/bin/python -m pip install -U yt-dlp
   ```
 
-### 3) „Nelze se připojit: chybí PyNaCl/Opus“
+### 3) „Nelze se připojit: chybí PyNaCl/Opus"
 
 * Do venv nainstalujte **PyNaCl** a v systému mějte **libopus0**:
 
@@ -336,7 +330,7 @@ python3 tools/rpi_voice_diagnostics.py
 
 ---
 
-## 🎧 Poznámky k Slash Commands (v2.1.5)
+## 🎧 Poznámky k Slash Commands (v2.3.2)
 
 ### Jak používat?
 
@@ -349,7 +343,7 @@ python3 tools/rpi_voice_diagnostics.py
 
 ```
 /yt https://youtube.com/watch?v=dQw4w9WgXcQ
-/dalí
+/další
 /verse
 /bless @username
 /komandy
@@ -366,144 +360,83 @@ python3 tools/rpi_voice_diagnostics.py
 | Modernost | ✅ Budoucí Discord | ❌ Zastaralé |
 | Error Handling | ✅ 39 try/except | ⚠️ Méně |
 
-**Doporučujeme: Upgrade na v2.1.0!**
+**Doporučujeme: Upgrade na v2.3.2!**
 
 ---
 
 ## 🛠️ Přizpůsobení
 
-* **Kanály**: změňte názvy v helperu `get_channel_by_name` nebo přidejte autodetekci podle ID.
+* **Kanály**: změňte názvy v helperu nebo přidejte autodetekci podle ID.
 * **Texty požehnání**: upravte dict `game_blessings`.
 * **Verše**: rozšiřte list `verses`.
-* **Plánovač**: upravte časy v `tasks.loop` (pozor na timezone `CET`).
+* **Plánovač**: upravte časy v `tasks.loop` (pozor na timezone `Europe/Prague`).
 
 ---
 
-
 ## 🛣️ Roadmapa – Ježíš Discord Bot (v2.x → v3.x)
 
-### 🟩 v2.3.1 (AKTUÁLNÍ VERZE – Multi-Server Thread-Safety Patch)
+### 🟩 v2.3.2 (AKTUÁLNÍ VERZE – Multi-Server Thread-Safety Patch)
 
 Nyní aktivní! Stabilizace pro multi-server deployment:
-* ✅ **Nové v2.3.1**: Guild-level locks pro bezpečné vytváření rolí
-* ✅ **Nové v2.3.1**: Periodic game tracking se storage (každých 5 minut)
-* ✅ **Nové v2.3.1**: Real-time herní statistiky bez race conditions
+* ✅ **Guild-level locks** pro bezpečné vytváření rolí
+* ✅ **Periodic game tracking** se storage (každých 5 minut)
+* ✅ **Real-time herní statistiky** bez race conditions
 * ✅ Automatické sledování hraných her uživatelů
 * ✅ Personalizovaná požehnání podle hrané hry (54 her)
 * ✅ `/profile` s TOP 5 herami, server rankingem, role achievements
 * ✅ Auto-role: 🎮 Gamer, 🌙 Night Warrior, ⛪ Weekend Crusader
 * ✅ Multi-server ready bez konflikty dat
-
-### 🟩 v2.3 (LEGACY – Game Presence Engine 2.0)
-
-Předchozí verze:
-* ✅ Automatické sledování hraných her uživatelů
-* ✅ Personalizovaná požehnání podle hrané hry (54 her)
-* ✅ `/profile` s TOP 5 herami, server rankingem, role achievements
-* ✅ Auto-role: 🎮 Gamer, 🌙 Night Warrior, ⛪ Weekend Crusader
-
-### 🟩 v2.2.1 (LEGACY – Enhanced Queue Display)
-
-Starší verze s hudbou:
-* ✅ `/fronta` zobrazuje názvy skladeb + URL (strukturovaně)
-* ✅ Hudba s českými názvy (auto-extrakce z YouTube)
-* ✅ Všechny minihry z v2.2 (kviz, versfight, rollblessing, profile basic)
+* ✅ Error handling s JSON
+* ✅ Všechny minihry (kviz, versfight, rollblessing)
 * ✅ XP systém: 🔰 Učedník → 📜 Prorok → 👑 Apoštol
-* ✅ Hry zdarma, verse streak
 
-### 🟩 v2.2 (PŘEDCHOZÍ VERZE – Minihry & Interakce)
+### 🟨 v2.4 – Music QoL Pack (PLÁNOVANÉ)
 
-Verze s minihrama:
-* ✅ `/biblickykviz` – biblický trivia s 10 otázkami a interaktivními buttony
-* ✅ `/versfight @user` – veršový duel se hlasováním
-* ✅ `/rollblessing` – RNG požehnání (cooldown 1h)
-* ✅ `/profile [@user]` – zobrazení XP a levelu (3 stupně)
-* ✅ XP Systém s automatickými levely
+* Rychlejší reconnect při ping spikech
+* Ukládání posledního voice kanálu → auto-reconnect po restartu
+* Lepší práce s frontou (blokace duplicity, auto-clean)
+* Přepracovaný `/fronta` s embedem
+* Stabilnější `/zastav` a reconnect logika
 
-### 🟩 v2.1.5 (LEGACY VERZE – Enhanced Game Display)
+### 🟨 v2.5 – Channel Config Pack (PLÁNOVANÉ)
 
-Starší verze:
-* ✅ Embed + Discord link previews pro hry zdarma (Epic, Steam, PlayStation)
-* ✅ 24/7 scheduled tasks (ranní zprávy, noční zprávy, free games)
-* ✅ RPi voice patches (Error 4006 – exponential backoff)
+* `/setchannel <typ> <kanál>` – rychlé nastavení kanálů
+* `/config` – přehled aktuální konfigurace serveru
+* Bezpečné ukládání nastavení per-guild
+* Validace perms a inteligentní hlášky
+* Čisté logování změn
 
+### 🟨 v2.6 – Free Games Engine 3.0 (PLÁNOVANÉ)
 
-## ✨ v2.2 – Minihry & Interakce (HOTOVO)
-* `/biblickykviz` – biblický trivia systém  
-* `/versfight @user` – veršový duel  
-* `/rollblessing` – RNG požehnání (cooldown)  
-* XP/role systém „učedník → prorok → apoštol“  
-* lehké textové minihry, RPi-friendly  
+* Přidané platformy: GOG, Ubisoft, Amazon Gaming
+* Embed galerie her
+* Upozornění na končící hry
+* `/freegames history`
+* Robustnější scraping + fallbacky
 
+### 🟨 v2.7 – Server Analytics & Summary (PLÁNOVANÉ)
 
+* `/serverstats` – přehled aktivit, hudby, miniher
+* Leaderboard hráčů
+* `/myactivity` – osobní statistiky
+* Týdenní shrnutí aktivit
+* Agregace hraných her + hudební historie
 
-## 🎮 v2.3.0 –  Game Presecne Engine 2.0 (HOTOVO)
-* ✅ Guild-level locks pro bezpečné vytváření rolí  
-* ✅ Periodic game tracking se storage (aktualizace každých 5 minut)  
-* ✅ Real-time herní statistiky bez race conditions  
-* ✅ Pokročilé sledování hraných her uživatelů  
-* ✅ Personalizovaná požehnání podle hrané hry (54 her)  
-* ✅ Server ranking a statistiky: TOP 5 her, celkový čas  
-* ✅ Auto-role: 🎮 Gamer (1+ hodina), 🌙 Night Warrior (23:00+), ⛪ Weekend Crusader (víkend)  
-* ✅ `/profile` integruje veškeré game presence data  
-* ✅ Multi-server ready – bez konflikty dat a bezpečné pro >2 servery
+### 🟨 v2.8 – Web Dashboard (PLÁNOVANÉ)
 
+* Běží přímo na Raspberry Pi (Flask/FastAPI)
+* Živé zobrazení právě hrané hudby
+* Vizuální konfigurace kanálů a nastavení
+* Log viewer + diagnostika
+* Mobile-friendly UI
 
+### 🟨 v3.0 – Ježíš Discord Bot PRO (PLÁNOVANÉ)
 
-
-## 🔥 v2.4 – Music QoL Pack
-* rychlejší reconnect při ping spikech  
-* ukládání posledního voice kanálu → auto-reconnect po restartu  
-* lepší práce s frontou (blokace duplicity, auto-clean)  
-* přepracovaný `/mqueue` s embedem  
-* stabilnější `/stop` a reconnect logika  
-
-
-
-## 🛠️ v2.5 – Channel Config Pack
-* `/setchannel <typ> <kanál>` – rychlé nastavení kanálů pro verše i „hry zdarma“  
-* `/config` – přehled aktuální konfigurace serveru  
-* bezpečné ukládání nastavení pro každý server zvlášť  
-* validace perms (pokud bot nemůže psát → inteligentní hláška)  
-* čisté logování změn (RPi-safe)
-
-
-
-## 🎁 v2.6 – Free Games Engine 3.0
-* přidány platformy: GOG, Ubisoft, Amazon Gaming  
-* embed galerie her  
-* upozornění na končící hry  
-* `/freegames history`  
-* robustnější scraping + bezpečné fallbacky  
-
-
-
-## 📈 v2.7 – Server Analytics & Summary
-* `/serverstats` – přehled aktivit, hudby, miniher  
-* leaderboard hráčů  
-* `/myactivity` – osobní statistiky  
-* týdenní shrnutí aktivit (bez AI – čistá data)  
-* agregace hraných her + hudební historie  
-
-
-
-## 🌐 v2.8 – Web Dashboard (Pi-hosted)
-* běžící přímo na Raspberry Pi (Flask nebo FastAPI)  
-* živé zobrazení právě hrané hudby  
-* vizuální konfigurace kanálů, nastavení, cron úloh  
-* log viewer + jednodušší diagnostika  
-* mobile-friendly UI  
-
-
-
-## 💎 v3.0 – Ježíš Discord Bot PRO
-* multi-language režim (CZ / EN / SK)  
-* modulární plugin systém  
-* oddělené konfigurace per-guild  
-* základní companion web app (PWA)  
-* příprava na více instancí (cluster-ready architektura)  
-
-
+* Multi-language režim (CZ / EN / SK)
+* Modulární plugin systém
+* Oddělené konfigurace per-guild
+* Companion web app (PWA)
+* Cluster-ready architektura
 
 ---
 
