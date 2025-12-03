@@ -333,6 +333,54 @@ def _estimate_queue_duration(guild_id: int) -> tuple:
     remaining_seconds = total_seconds % 60
     return (total_minutes, remaining_seconds, len(queue))
 
+def _is_youtube_playlist(url: str) -> bool:
+    """Detekuj zda je URL YouTube playlist (v2.4.1)."""
+    return "youtube.com/playlist" in url or "youtu.be/playlist" in url or "list=" in url
+
+def _shuffle_queue(guild_id: int):
+    """Zamíchej frontu - zachovej první skladbu (v2.4.1)."""
+    queue = _queue_for(guild_id)
+    if len(queue) <= 1:
+        return False
+    
+    # Vezmi první skladbu
+    first = queue[0]
+    # Vezmi zbytek a zamíchej
+    rest = list(queue)[1:]
+    random.shuffle(rest)
+    # Rekonstruuj frontu
+    queue.clear()
+    queue.append(first)
+    queue.extend(rest)
+    return True
+
+async def extract_playlist_tracks(url: str) -> list:
+    """Extrahuj všechny skladby z YouTube playlistu (v2.4.1)."""
+    try:
+        ydl_opts = {
+            "extract_flat": "in_playlist",
+            "quiet": True,
+            "no_warnings": True,
+            "socket_timeout": 30
+        }
+        
+        with _yt_dlp.YoutubeDL(ydl_opts) as ydl:
+            info = ydl.extract_info(url, download=False)
+            tracks = []
+            
+            if info and "entries" in info:
+                for entry in info.get("entries", []):
+                    if entry:
+                        track_url = f"https://www.youtube.com/watch?v={entry.get('id', '')}"
+                        track_title = entry.get("title", "Neznámá skladba")
+                        tracks.append({"url": track_url, "title": track_title})
+            
+            return tracks
+    
+    except Exception as e:
+        print(f"[playlist] Error extracting tracks: {e}")
+        return []
+
 async def wait_until_connected(vc: Optional[discord.VoiceClient], tries: int = 15, delay: float = 0.3) -> bool:
     """Opakovaně zkontroluj, zda je voice skutečně připojený."""
     for i in range(tries):
@@ -755,7 +803,7 @@ async def on_ready():
 
 @bot.tree.command(name="yt", description="Přidej skladbu do fronty a přehrávej z YouTube")
 async def yt_command(interaction: discord.Interaction, url: str):
-    """Slash command /yt – přehrávání hudby z YouTube."""
+    """Slash command /yt – přehrávání hudby z YouTube. v2.4.1: Také playlisty!"""
     await interaction.response.defer()
     guild = interaction.guild
     if not guild:
@@ -783,33 +831,87 @@ async def yt_command(interaction: discord.Interaction, url: str):
             await interaction.followup.send(f"❌ Nemohu se připojit k voice kanálu: {str(e)[:100]}")
             return
     
-    # Extrahuj název z URL pomocí yt-dlp
-    try:
-        title = "Načítám..."
-        extracted = ytdlp_extract(url)
-        title = extracted.get("title", "Neznámá skladba")
-        duration = extracted.get("duration", 180)  # v2.4: ulož dobu trvání
-        song_durations[url] = duration
-    except Exception as e:
-        title = "Chyba při načítání názvu"
-        print(f"[yt] Error extracting title: {e}")
+    # v2.4.1: Detekuj playlist
+    is_playlist = _is_youtube_playlist(url)
     
-    # v2.4: Blokace duplicit v frontě
-    if _is_url_in_queue(guild.id, url):
-        await interaction.followup.send(f"⚠️ **{title}** je už ve frontě! Přeskakuji duplikát.")
-        return
+    if is_playlist:
+        # PLAYLIST MODE – v2.4.1
+        await interaction.followup.send("⏳ Načítám playlist... To může chvíli trvat...")
+        
+        try:
+            tracks = await extract_playlist_tracks(url)
+            
+            if not tracks:
+                await interaction.followup.send("❌ Playlist je prázdný nebo nedostupný!")
+                return
+            
+            added_count = 0
+            skipped_count = 0
+            
+            for track in tracks:
+                track_url = track.get("url", "")
+                track_title = track.get("title", "Neznámá skladba")
+                
+                # v2.4: Blokace duplicit
+                if _is_url_in_queue(guild.id, track_url):
+                    skipped_count += 1
+                    continue
+                
+                # v2.4.1: Rychlý import - bez extrakce detailu (výchozí duration 180s)
+                song_durations[track_url] = 180
+                
+                # Přidej do fronty
+                _queue_for(guild.id).append({"url": track_url, "title": track_title})
+                _add_url_to_queue(guild.id, track_url)
+                added_count += 1
+            
+            # Spusť přehrávání pokud se nic nehraje
+            if not vc.is_playing() and added_count > 0:
+                await play_next(guild, interaction.channel)
+            
+            # Shrnutí
+            summary = f"✅ **Playlist importován!**\n"
+            summary += f"✓ Přidáno: {added_count} skladeb\n"
+            if skipped_count > 0:
+                summary += f"⊘ Duplikáty přeskočeny: {skipped_count}\n"
+            
+            mins, secs, total = _estimate_queue_duration(guild.id)
+            summary += f"⏱️ Celkový čas fronty: ~{mins}m {secs}s ({total} skladeb)"
+            
+            await interaction.followup.send(summary)
+        
+        except Exception as e:
+            print(f"[yt] Playlist error: {e}")
+            await interaction.followup.send(f"❌ Chyba při načítání playlistu: {str(e)[:100]}")
     
-    _queue_for(guild.id).append({"url": url, "title": title})
-    _add_url_to_queue(guild.id, url)  # v2.4: přidej do setu
-    
-    if not vc.is_playing():
-        await play_next(guild, interaction.channel)
-        await interaction.followup.send(f"▶️ Začínám přehrávat: **{title}**\n{url}")
     else:
-        # v2.4: Ukaž odhad času
-        mins, secs, count = _estimate_queue_duration(guild.id)
-        duration_str = f" (~{mins}m {secs}s, {count} skladeb v frontě)" if count > 0 else ""
-        await interaction.followup.send(f"✅ Přidáno do fronty: **{title}**\n{url}{duration_str}")
+        # SINGLE TRACK MODE – Původní v2.4 logika (NEZMĚNÍ SE!)
+        try:
+            title = "Načítám..."
+            extracted = ytdlp_extract(url)
+            title = extracted.get("title", "Neznámá skladba")
+            duration = extracted.get("duration", 180)  # v2.4: ulož dobu trvání
+            song_durations[url] = duration
+        except Exception as e:
+            title = "Chyba při načítání názvu"
+            print(f"[yt] Error extracting title: {e}")
+        
+        # v2.4: Blokace duplicit v frontě
+        if _is_url_in_queue(guild.id, url):
+            await interaction.followup.send(f"⚠️ **{title}** je už ve frontě! Přeskakuji duplikát.")
+            return
+        
+        _queue_for(guild.id).append({"url": url, "title": title})
+        _add_url_to_queue(guild.id, url)  # v2.4: přidej do setu
+        
+        if not vc.is_playing():
+            await play_next(guild, interaction.channel)
+            await interaction.followup.send(f"▶️ Začínám přehrávat: **{title}**\n{url}")
+        else:
+            # v2.4: Ukaž odhad času
+            mins, secs, count = _estimate_queue_duration(guild.id)
+            duration_str = f" (~{mins}m {secs}s, {count} skladeb v frontě)" if count > 0 else ""
+            await interaction.followup.send(f"✅ Přidáno do fronty: **{title}**\n{url}{duration_str}")
 
 @bot.tree.command(name="další", description="Přeskoč na další písničku")
 async def dalsi_command(interaction: discord.Interaction):
@@ -958,6 +1060,39 @@ async def vtest_command(interaction: discord.Interaction):
         await interaction.followup.send("✅ Voice test úspěšný!")
     except Exception as e:
         await interaction.followup.send(f"❌ Voice test selhalo: {str(e)[:100]}")
+
+@bot.tree.command(name="shuffle", description="Zamíchej frontu (v2.4.1)")
+async def shuffle_command(interaction: discord.Interaction):
+    """Shuffle music queue while preserving currently playing song."""
+    try:
+        guild = interaction.guild
+        queue = _queue_for(guild.id)
+        
+        if len(queue) <= 1:
+            await interaction.response.send_message("❌ Ve frontě je málo skladeb na zamíchání!")
+            return
+        
+        # Zamíchej frontu
+        shuffled = _shuffle_queue(guild.id)
+        
+        if shuffled:
+            # Ukaž prvních pár skladeb po shuffle
+            items = []
+            for i, item in enumerate(list(queue)[:5], 1):
+                title = item.get("title", "Neznámá skladba")[:50]
+                items.append(f"{i}. {title}")
+            
+            items_str = "\n".join(items)
+            mins, secs, count = _estimate_queue_duration(guild.id)
+            
+            embed = discord.Embed(title="🔀 Fronta zamíchána!", description=items_str, color=discord.Color.blue())
+            embed.add_field(name="Celkem", value=f"{count} skladeb (~{mins}m {secs}s)", inline=False)
+            await interaction.response.send_message(embed=embed)
+        else:
+            await interaction.response.send_message("❌ Chyba při zamíchávání!")
+    
+    except Exception as e:
+        await interaction.response.send_message(f"❌ Chyba: {str(e)[:100]}")
 
 # ═══════════════════════════════════════════════════════════════════════════════
 #              12. SLASH COMMANDS – OSTATNÍ / OTHER
@@ -1178,36 +1313,13 @@ async def verze_command(interaction: discord.Interaction):
     """Show bot version and changelog."""
     try:
         embed = discord.Embed(title="ℹ️ Ježíš Discord Bot", color=discord.Color.gold())
-        embed.add_field(name="Verze", value="v2.4 – Music QoL Pack (Duplicate Block)", inline=False)
-        embed.add_field(name="Co je nového", value="""
-**v2.4 – Music QoL Pack:** (AKTUÁLNÍ)
-🚫 NOVÉ: Blokace duplicitních skladeb v frontě
-⏱️ NOVÉ: Odhad času trvání fronty v `/fronta` a `/yt`
-🧹 NOVÉ: Auto-clean URL setu po vymazání skladby
-⚡ Lepší reconnect při ping spikech (FFMPEG)
-📚 Ukládání doby trvání skladeb (pro odhady)
-✅ Všechny v2.3.1 features zachovány!
-
-**v2.3.1 – Multi-Server Thread-Safety Patch:**
-🔒 Guild-level locks pro bezpečné vytváření rolí
-📊 Periodic game tracking se storage (každých 5 minut)
-⚡ Real-time herní statistiky bez race conditions
-🎮 Automatické sledování hraných her uživatelů
-
-**v2.3 – Game Presence Engine 2.0:**
-🎮 Automatické sledování hraných her uživatelů
-🎮 Personalizovaná požehnání podle hrané hry (54 her)
-
-**v2.2.1 – Enhanced Queue Display:**
-✨ `/fronta` zobrazuje strukturovaně: název + URL
-✨ Auto-extrakce názvů skladeb z YouTube
-
-**v2.2 – Minihry & Interakce:**
-🎮 `/biblickykviz`, `/versfight`, `/rollblessing`, `/profile`
-🏅 XP Systém: 🔰 Učedník → 📜 Prorok → 👑 Apoštol
-
-✅ Slash commands pro modernost a bezpečnost
-""", inline=False)
+        embed.add_field(name="Verze", value="v2.4.1 – Music Playlist & Shuffle", inline=False)
+        embed.add_field(name="Aktuální Features", value="""
+🎵 YouTube Playlist support – `/yt <playlist_url>`
+🔀 `/shuffle` – Zamíchat frontu
+📊 Odhad času fronty
+🚫 Blokace duplikátů
+✅ Multi-server ready""", inline=False)
         embed.add_field(name="GitHub", value="https://github.com/Braska-botmaker/Chatbot-discord-JESUS", inline=False)
         await interaction.response.send_message(embed=embed)
     except Exception as e:
@@ -1217,9 +1329,10 @@ async def verze_command(interaction: discord.Interaction):
 async def komandy_command(interaction: discord.Interaction):
     """Show all available commands."""
     try:
-        embed = discord.Embed(title="📋 Příkazy – Ježíš Discord Bot v2.4", color=discord.Color.blue())
+        embed = discord.Embed(title="📋 Příkazy – Ježíš Discord Bot v2.4.1", color=discord.Color.blue())
         embed.add_field(name="🎵 Hudba", value="""
-/yt <url> – Přehrávej z YouTube
+/yt <url> – Přehrávej z YouTube (playlist support)
+/shuffle – Zamíchat frontu
 /další – Přeskoč
 /pauza – Pozastav
 /pokračuj – Pokračuj
@@ -1262,7 +1375,7 @@ async def diag_command(interaction: discord.Interaction):
     voice_count = len(bot.voice_clients)
     embed.add_field(name="🎤 Voice", value=f"Connected: {voice_count}", inline=True)
     if bot.user:
-        embed.add_field(name="⏱️ Verze", value="v2.4\nMusic QoL Pack", inline=True)
+        embed.add_field(name="⏱️ Verze", value="v2.4.1\nMusic Playlist & Shuffle", inline=True)
     await interaction.followup.send(embed=embed)
 
 # ═══════════════════════════════════════════════════════════════════════════════

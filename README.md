@@ -1,10 +1,10 @@
 # ✝️ Ježíš Discord Bot – hudba, verše a hry zdarma 🙏
 
-**Verze:** v2.4 – Music QoL Pack | **Platform:** Raspberry Pi Ready
+**Verze:** v2.4.1 – Music Playlist & Shuffle | **Platform:** Raspberry Pi Ready
 
 Discord bot napsaný v Pythonu (discord.py), který umí:
 
-* 🎵 Přehrávat hudbu z URL (YouTube přes `yt-dlp`) do voice kanálu - s názvy skladeb, odhadem času fronty a blokaací duplicitních skladeb
+* 🎵 Přehrávat hudbu z URL (YouTube přes `yt-dlp`) do voice kanálu - s názvy skladeb, odhadem času fronty, blokaací duplicitních skladeb, a podporou playlistů
 * 📖 Posílat ranní a večerní zprávy s biblickým veršem
 * 🙏 Žehnat hráčům při spuštění her a reagovat na společné hraní ve voice
 * 🎁 Každý večer publikovat „Hry zdarma" s embedem a Discord link previews
@@ -185,14 +185,14 @@ Hezký přehled najdete v `/komandy`. Základ:
 
 ### Hudba
 
-* `/yt <url>` – přidá skladbu do fronty a spustí přehrávání (YouTube přes yt-dlp) – **v2.4: Detekuje duplikáty, zobrazuje odhad času fronty | v2.4.1: Podporuje i YouTube playlisty**
+* `/yt <url>` – přidá skladbu nebo playlist do fronty a spustí přehrávání (YouTube přes yt-dlp) – **v2.4: Detekuje duplikáty, zobrazuje odhad času fronty | v2.4.1: Podporuje YouTube playlisty s batch importem a progress feedbackem**
 * `/sp <spotify_url>` – **v2.8: NOVÉ - Přidá skladbu/playlist ze Spotify do fronty (vyhledávání přes YouTube)**
+* `/shuffle` – **v2.4.1: Náhodně zamíchá pořadí skladeb ve frontě (aktuálně hraná zůstane na místě)**
 * `/další` – přeskoči aktuální skladbu
 * `/pauza` / `/pokračuj` – pauza/obnovení
 * `/zastav` – zastaví a vyčistí frontu
 * `/odejdi` – odpojí bota z voice
 * `/fronta` – vypíše frontu **v2.4: S odhadem celkového času (⏱️ Odhad: ~45m 30s)**
-* `/shuffle` – **v2.4.1: NOVÉ - Náhodně zamíchá pořadí skladeb ve frontě**
 * `/np` – zobrazí právě přehrávanou skladbu
 * `/vtest` – rychlý 3s tón pro ověření FFmpeg/voice
 * `/diag` – výpis prostředí, práv a instalace
@@ -392,9 +392,9 @@ Předchozí verze:
 * ✅ Všechny minihry (kviz, versfight, rollblessing)
 * ✅ XP systém: 🔰 Učedník → 📜 Prorok → 👑 Apoštol
 
-### 🟨 v2.4 (AKTUÁLNÍ VERZE – Music QoL Pack)
+### 🟨 v2.4 (LEGACY – Music QoL Pack)
 
-Nyní aktivní! Zlepšení hudby a miniher:
+Předchozí verze! Zlepšení hudby a miniher:
 * ✅ **Blokace duplicitních skladeb** – Detekuje když se uživatel pokusí přidat stejnou skladbu do fronty
 * ✅ **Odhad času fronty** – `/fronta` a `/yt` zobrazují odhad zbývajícího času (⏱️ Odhad: ~45m 30s, 12 skladeb)
 * ✅ **Automatické čištění URL setu** – Když se skladba přehraje nebo se fronta vymaže
@@ -403,13 +403,16 @@ Nyní aktivní! Zlepšení hudby a miniher:
 * ✅ Všechny funkce v2.3.2 zachovány (bez breaking changes)
 * ✅ Optimalizované pro multi-server i single-server nasazení
 
-### 🟨 v2.4.1 – Music Playlist & Shuffle (PLÁNOVANÉ)
+### 🟩 v2.4.1 – Music Playlist & Shuffle (AKTUÁLNÍ VERZE)
 
-* **YouTube Album/Playlist v jednom kroku** – `/yt <playlist_url>` detekuje playlist a přidá všechny skladby najednou s duplikát-checkingem
-* **Zamíchání fronty** – Nový command `/shuffle` náhodně zamíchá pořadí skladeb ve frontě (aktuálně hraná skladba zůstane na místě)
-* **Odhad času playlistu** – Bot vypočítá a zobrazí celkový čas všech skladeb v playlistu před přidáním
-* **Batch progress feedback** – Zobrazuje průběh přidávání: "⏳ Přidávám: 5/24 skladeb..."
-* Zpětná kompatibilita s v2.4 (vše funguje jako do teď)
+Nyní aktivní! Playlist a shuffle funkcionalita:
+* ✅ **YouTube Album/Playlist v jednom kroku** – `/yt <playlist_url>` detekuje playlist a přidá všechny skladby najednou s duplikát-checkingem
+* ✅ **Zamíchání fronty** – Nový command `/shuffle` náhodně zamíchá pořadí skladeb ve frontě (aktuálně hraná skladba zůstane na místě)
+* ✅ **Odhad času playlistu** – Bot vypočítá a zobrazí celkový čas všech skladeb v playlistu před přidáním
+* ✅ **Batch progress feedback** – Zobrazuje průběh přidávání: "⏳ Přidávám: 5/24 skladeb..."
+* ✅ **Duplikát blocking na playlistech** – Automaticky detekuje a přeskakuje duplikáty v playlistech
+* ✅ Zpětná kompatibilita s v2.4 (vše funguje jako do teď)
+* ✅ YouTube přehrávání zůstává beze změn (stejně skvěle funguje!)
 
 ### 🟨 v2.5 – Channel Config Pack (PLÁNOVANÉ)
 
