@@ -1332,15 +1332,15 @@ async def komandy_command(interaction: discord.Interaction):
         embed = discord.Embed(title="📋 Příkazy – Ježíš Discord Bot v2.4.1", color=discord.Color.blue())
         embed.add_field(name="🎵 Hudba", value="""
 /yt <url> – Přehrávej z YouTube (playlist support)
-/shuffle – Zamíchat frontu
-/další – Přeskoč
-/pauza – Pozastav
+/shuffle – Zamíchá frontu
+/další – Přeskočí zrovna hranou skladbu
+/pauza – Pozastaví hraní skladby
 /pokračuj – Pokračuj
-/zastav – Zastavit & vyčistit
-/odejdi – Odejít z voice
-/np – Co se hraje
-/fronta – Zobraz frontu
-/vtest – Test voice
+/zastav – Zastavá & vyčistí frontu
+/odejdi – Odejde z voice kanálu
+/np – Ukáže právě hranou skladbu
+/fronta – Zobrazí hudební frontu
+/vtest – Otestuje voice připojení
 """, inline=False)
         embed.add_field(name="📖 Ostatní", value="""
 /verze – Info o verzi
