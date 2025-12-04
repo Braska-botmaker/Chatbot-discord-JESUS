@@ -716,7 +716,7 @@ game_blessings = {
     "Kingdom Come: Deliverance": "Ať tvoje jízdy na **Šedivce** 🐴 neskončí držkou v blátě. **Jindřich!** 🛡️",
     "Kingdom Come: Deliverance II": "Ať se **Jindra** dočká **klidu** a ty nepadáš v každým souboji. **Bojuj!** ⚔️",
     "Outlast": "Ať tě **Chris Walker** nikdy nechytí 🏃. *Shut up, little piggy.* 🐷",
-    "Outlast 2": "BŮH CHCE TO DÍTĚ, BUJ CHCE TO DÍTĚ! 🙏 Ať přežiješ tuhle **šílenou jízdu** .",
+    "Outlast 2": "BŮH CHCE TO DÍTĚ, BŮH CHCE TO DÍTĚ! 🙏 Ať přežiješ tuhle **šílenou jízdu** .",
     "The Outlast Trials": "Ať **přežiješ testy** 🧪 se všemi **končetinami** na místě. **Reagent!**",
     "Escape from Tarkov": "Ať tě nezastřelí týpek s **TOZkou přes půl mapy** 🚫 a extrahuješ dřív, než ti dojde **krev** 🩸.",
     "The Last of Us": "Ať tě **svět nezlomí** a každý krok stojí za to. **Přežij!** 🦠",
