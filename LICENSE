@@ -1,119 +1,107 @@
-# Creative Commons Attribution-NonCommercial 4.0 International (CC BY-NC 4.0)
-## SPDX-License-Identifier: CC-BY-NC-4.0
-## Ježíš Discord Bot – Copyright © 2025 Matěj Braska (Braska-botmaker)
+JEŽÍŠ DISCORD BOT – CUSTOM NON-COMMERCIAL LICENSE
+Version 1.0, December 6, 2025
+
+Copyright (C) 2025 Matěj Horák (Braska-botmaker)
+All Rights Reserved
+
+SPDX-License-Identifier: LicenseRef-Custom-NonCommercial-1.0
 
 ---
 
-## RESUMES (souhrn)
+PREAMBLE
 
-Toto dílo je chráněno licencí **Creative Commons Attribution-NonCommercial 4.0 International**.
-
-✅ **Můžeš:** Sdílet, kopírovat, upravovat
-❌ **Nesmíš:** Komerční účely bez svolení
-⚠️ **Musíš:** Zmínit autora a uvést licenci
+Tato licence je určena k ochraně autorských práv projektu "Ježíš Discord Bot" 
+a umožňuje svobodné šíření, kopírování a úpravy kódu pro osobní a nekomercí účely,
+přičemž zachovává právo autora na finanční a komerční využití.
 
 ---
 
-## PRÁVNÍ TEXTO (Legal Wording)
+TERMS AND CONDITIONS
 
-### 1. DEFINICE
+0. DEFINICE
 
-**"Vaše dílo"** = upravená verze Ježíš Discord Bota
-**"Licence"** = Creative Commons Attribution-NonCommercial 4.0 International
-**"Licenční strany"** = Vy (uživatel) a Matěj Braska (autor)
+"Program" – Ježíš Discord Bot a veškekerý zdrojový kód
+"Upravená verze" – jakákoli modifikace Programu
+"Distribuce" – šíření Programu nebo upravené verze
+"Komerční použití" – jakékoli využití za účelem zisku, peněz nebo finančního zisku
+"Autor" – Matěj Horák (Braska-botmaker)
 
-### 2. LICENCOVANÁ PRÁVA
+1. POVOLENÍ (Co smíš dělat)
 
-Pod podmínkami této Licence získáváte právo:
+Jste oprávněni:
 
-a) **Reprodukce** – Kopírovat dílo do paměti počítače
-b) **Distribuce** – Šířit kopie nebo verze díla
-c) **Úpravy** – Remixy, transformace a adaptace díla
-d) **Veřejné provádění/zobrazení** – Osobní, nekomercí účely
+a) Kopírovat Program v plném rozsahu
+b) Distribuovat kopie Programu zdarma (bez poplatku)
+c) Upravovat Program pro osobní potřebu
+d) Studovat, analyzovat a pochopit zdrojový kód
+e) Spouštět Program na svých serverech a počítačích pro osobní účely
+f) Používat Program v nekomercí komunitách a projektů
+g) Vytvářet technickou dokumentaci a tutoriály
 
-### 3. PODMÍNKY
+2. PODMÍNKY
 
-Máte právo na výše uvedené pouze když:
+Všechna výše uvedená práva jsou podmíněna:
 
-**a) Označení (Attribution)**
-- Musíte jasně uvést:
-  - Jméno autora: Matěj Braska (Braska-botmaker)
-  - Odkaz na původní dílo: https://github.com/Braska-botmaker/Chatbot-discord-JESUS
-  - Tuto licenci: CC BY-NC 4.0
-  - Čestné prohlášení zda bylo dílo upraveno
-- Zmínění může být přiměřeným způsobem podle okolností
+a) OZNAČENÍ AUTORA – Pokud distribuujete Program nebo upravenou verzi, musíte:
+   - Jasně uvést: "Původní kód vytvořil Matěj Horák (Braska-botmaker)"
+   - Přiložit odkaz na originální repozitář: https://github.com/Braska-botmaker/Chatbot-discord-JESUS
+   - Zachovat tuto licenci v programu
 
-**b) NonCommercial (Non-komercialita)**
-- Dílo NESMÍTE používat pro komerční účely
-- Komerční znamená: prodej, zisk, peníze, finanční zisky
-- Příklady ZAKÁZANÉHO:
-  - Prodávání bota nebo jeho verzí
-  - Pronajímání bot-hostingu za peníze
-  - Nabídnutí bot-managementu jako služby
-  - YouTube kanál monetizovaný přes video obsahující kód
-  - Patreon/sponsorování s rozpočítáním příjmu na kód
-  - Prodej Discord serveru, kde kód běží
+b) ABSENCE KOMERČNÍHO ÚČELU – Program NESMÍTE:
+   - Prodávat nebo pronajímat
+   - Nabízet jako placené služby
+   - Včleňovat do placených produktů
+   - Monetizovat (YouTube AdSense s rozpočtem na kód, Patreon s kódem, atd.)
+   - Používat v komerčích projektech bez výslovného svolení autora
+   - Vydávat za svůj bez zmínění autora
 
-- Příklady POVOLENÉ:
-  - Osobní Discord server
-  - Discord server pro přátele/komunitu (bez zisku)
-  - Vzdělávací materiály (bez prodeje)
-  - Vývoj pro vlastní potřebu
+c) ZACHOVÁNÍ LICENCE – Pokud distribuujete upravenou verzi, musí být:
+   - Pod stejnou nebo kompatibilní licencí
+   - Se zachovaným textem této licence
 
-### 4. VÝJIMKY PRO KOMERČNÍ LICENCI
+3. KOMERČNÍ LICENCE
 
-Pokud chcete používat dílo pro komerční účely:
-1. Napište Matěji Braské na GitHub
+Chcete-li Program používat pro komerční účely:
+1. Napište autorovi na GitHub: https://github.com/Braska-botmaker
 2. Vyjednají se individuální podmínky
 3. Podepíšete komerční smlouvu
-4. Zaplatíte dohodnutý poplatek (pokud je vyžadován)
+4. Zaplatíte dohodnutý poplatek (pokud bude vyžadován)
 
-Bez výslovného písemného svolení je komerční použití zakázáno.
+Bez výslovného písemného svolení je jakékoli komerční použití zakázáno a porušuje tuto licenci.
 
-### 5. BEZ ZÁRUK
+4. OMEZENÍ ODPOVĚDNOSTI
 
-Dílo se poskytuje "TAK JAK JE" bez jakýchkoliv záruk, výslovných či odvozených.
-Autor není odpovědný za:
-- Nefunkčnost kódu
+Program se poskytuje "TAK JAK JE" bez jakýchkoliv záruk.
+
+Autor NENÍ odpovědný za:
+- Nefunkčnost nebo chyby v kódu
 - Ztrátu dat nebo zisku
-- Přerušení provozu
-- Škody způsobené používáním kódu
-- Porušení Discord Terms of Service
-- Právní problémy (DMCA, copyright, atd.)
+- Přerušení služby nebo provozu
+- Jakékoli škody způsobené používáním Programu
+- Porušení Discord Terms of Service či jiných služeb
+- Právní problémy vzniklé používáním Programu
 
-### 6. ODPOVĚDNOST UŽIVATELE
+5. ZRUŠENÍ
 
-Používáním tohoto kódu souhlasíte:
-- Se všemi podmínkami této licence
-- S odpovědností za veškeré následky
-- S tím, že máte právo kód používat
-- Že nekopírujete jiný obsah bez svolení
+Porušením kterékoli podmínky (zejména komerčním používáním bez svolení)
+automaticky ztrácíte všechna práva z této licence.
 
-### 7. ZRUŠENÍ
+6. PLATNOST
 
-Porušením kterékoli podmínky automaticky ztrácíte práva z této licence.
-
-### 8. PLATNOST
-
-Tato licence je platná do 31. prosince 2099 nebo do jejího zrušení.
+Tato licence je platná od 6. prosince 2025 do odvolání.
+Autor si vyhrazuje právo na změnu podmínek s předstihem 30 dní.
 
 ---
 
-## OFICIÁLNÍ ODKAZ
+SHRNUTÍ
 
-Plný text CC BY-NC 4.0: https://creativecommons.org/licenses/by-nc/4.0/
-
----
-
-## KONTAKT
-
-Máš-li dotazy nebo potřebuješ komerční licenci:
-- **GitHub:** https://github.com/Braska-botmaker
-- **Projekt:** https://github.com/Braska-botmaker/Chatbot-discord-JESUS
+✅ POVOLENO: Kopírování, úpravy, osobní používání, nekomercí distribuce
+❌ ZAKÁZÁNO: Prodej, komerční služby, monetizace bez svolení
+⚠️ POVINNÉ: Zmínit autora, zachovat licenci
 
 ---
 
-**Licence:** Creative Commons Attribution-NonCommercial 4.0 International (CC BY-NC 4.0)
-**Poslední aktualizace:** 6. prosince 2025
-**Platná od:** 6. prosince 2025
-**Autorské právo © 2025 Matěj Braska (Braska-botmaker)**
+Copyright © 2025 Matěj Horák (Braska-botmaker)
+Všechna práva vyhrazena.
+
+Pro více informací navštivte: https://github.com/Braska-botmaker/Chatbot-discord-JESUS
