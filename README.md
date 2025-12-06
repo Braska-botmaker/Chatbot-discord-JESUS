@@ -477,7 +477,27 @@ Nyní aktivní! Správa konfigurace per-guild:
 
 ## 📄 Licence
 
-Zvolte licenci dle potřeby (např. MIT). Přidejte `LICENSE` soubor do repozitáře.
+**JEŽÍŠ DISCORD BOT – CUSTOM NON-COMMERCIAL LICENSE**
+
+Tento projekt je chráněn vlastní non-commercial licencí. 
+
+✅ **Povoleno:**
+- Kopírování a úpravy kódu
+- Osobní a nekomercí používání
+- Distribuce v nekomercích účelech (bez poplatku)
+
+❌ **Zakázáno:**
+- Komerční využití (prodej, placené služby, monetizace bez svolení)
+- Vydávání kódu za své bez zmínění autora
+
+⚠️ **Povinné:**
+- Zmínit autora: **Matěj Horák (Braska-botmaker)**
+- Zachovat licenci v distribuovaných verzích
+- Odkaz na originální repozitář: https://github.com/Braska-botmaker/Chatbot-discord-JESUS
+
+**Komerční licence:** Chcete-li kód používat komerčně, napište autorovi na GitHub pro vyjednání individuálních podmínek.
+
+Plný text licence: **LICENSE** soubor v kořeni repozitáře
 
 ---
 
