@@ -179,6 +179,25 @@ def _g(db, gid, key, default):
     """Guild-specific data namespace"""
     return db.setdefault(str(gid), {}).setdefault(key, default)
 
+def _get_guild_all_config(db, gid: int) -> dict:
+    """Vrátí kompletní konfiguraci pro guild z bot_data.json (v2.5)."""
+    guild_data = _g(db, gid, "config", {})
+    if "blessing_channel" not in guild_data:
+        guild_data["blessing_channel"] = None
+    if "freegames_channel" not in guild_data:
+        guild_data["freegames_channel"] = None
+    return guild_data
+
+async def _save_guild_config_to_db(db, gid: int, channel_type: str, channel_id: Optional[int]):
+    """Ulož channel konfiguraci do bot_data.json (v2.5)."""
+    config = _get_guild_all_config(db, gid)
+    channel_key = f"{channel_type}_channel"
+    if channel_key in config:
+        config[channel_key] = channel_id
+        _g(db, gid, "config", config)
+        await _save_data(db)
+        print(f"[config] Guild {gid}: {channel_type} → {channel_id} (uloženo)")
+
 # ═══════════════════════════════════════════════════════════════════════════════
 #                      5. AUDIO DETECTION & SETUP
 # ═══════════════════════════════════════════════════════════════════════════════
@@ -332,6 +351,30 @@ def _estimate_queue_duration(guild_id: int) -> tuple:
     total_minutes = total_seconds // 60
     remaining_seconds = total_seconds % 60
     return (total_minutes, remaining_seconds, len(queue))
+
+# v2.5 CONFIG HELPERS
+def _get_channel_for_type(guild: discord.Guild, channel_type: str) -> Optional[discord.TextChannel]:
+    """Vrátí channel objektu dle typu (blessing, freegames), nebo fallback na jméno."""
+    # Načti konfiguraci z bot_data.json
+    db = _load_data()
+    config = _get_guild_all_config(db, guild.id)
+    channel_id = config.get(f"{channel_type}_channel")
+    
+    if channel_id:
+        channel = guild.get_channel(channel_id)
+        if channel:
+            return channel
+    
+    # Fallback na staré hledání podle jména
+    fallback_names = {
+        "blessing": "požehnání🙏",
+        "freegames": "hry_zdarma💵"
+    }
+    fallback_name = fallback_names.get(channel_type)
+    if fallback_name:
+        return discord.utils.get(guild.text_channels, name=fallback_name)
+    
+    return None
 
 def _is_youtube_playlist(url: str) -> bool:
     """Detekuj zda je URL YouTube playlist (v2.4.1)."""
@@ -1313,13 +1356,14 @@ async def verze_command(interaction: discord.Interaction):
     """Show bot version and changelog."""
     try:
         embed = discord.Embed(title="ℹ️ Ježíš Discord Bot", color=discord.Color.gold())
-        embed.add_field(name="Verze", value="v2.4.1 – Music Playlist & Shuffle", inline=False)
+        embed.add_field(name="Verze", value="v2.5 – Channel Config Pack", inline=False)
         embed.add_field(name="Aktuální Features", value="""
-🎵 YouTube Playlist support – `/yt <playlist_url>`
-🔀 `/shuffle` – Zamíchat frontu
+⚙️ `/setchannel` – Konfiguruj kanály
+📋 `/config` – Zobraz nastavení
+🎵 YouTube Playlist & Shuffle (v2.4.1)
 📊 Odhad času fronty
 🚫 Blokace duplikátů
-✅ Multi-server ready""", inline=False)
+✅ Per-guild konfigurace""", inline=False)
         embed.add_field(name="GitHub", value="https://github.com/Braska-botmaker/Chatbot-discord-JESUS", inline=False)
         await interaction.response.send_message(embed=embed)
     except Exception as e:
@@ -1329,7 +1373,7 @@ async def verze_command(interaction: discord.Interaction):
 async def komandy_command(interaction: discord.Interaction):
     """Show all available commands."""
     try:
-        embed = discord.Embed(title="📋 Příkazy – Ježíš Discord Bot v2.4.1", color=discord.Color.blue())
+        embed = discord.Embed(title="📋 Příkazy – Ježíš Discord Bot v2.5", color=discord.Color.blue())
         embed.add_field(name="🎵 Hudba", value="""
 /yt <url> – Přehrávej z YouTube (playlist support)
 /shuffle – Zamíchá frontu
@@ -1349,6 +1393,10 @@ async def komandy_command(interaction: discord.Interaction):
 /bless [@user] – Požehnání
 /diag – Diagnostika
 /komandy – Tohle
+""", inline=False)
+        embed.add_field(name="⚙️ Admin (v2.5)", value="""
+/setchannel <typ> <kanál> – Nastav kanál
+/config – Zobraz konfiguraci
 """, inline=False)
         embed.add_field(name="🎮 Minihry & Hry (v2.4)", value="""
 /biblickykviz – Biblické otázky za XP
@@ -1375,8 +1423,75 @@ async def diag_command(interaction: discord.Interaction):
     voice_count = len(bot.voice_clients)
     embed.add_field(name="🎤 Voice", value=f"Connected: {voice_count}", inline=True)
     if bot.user:
-        embed.add_field(name="⏱️ Verze", value="v2.4.1\nMusic Playlist & Shuffle", inline=True)
+        embed.add_field(name="⏱️ Verze", value="v2.5\nChannel Config Pack", inline=True)
     await interaction.followup.send(embed=embed)
+
+@bot.tree.command(name="setchannel", description="Nastav kanál pro požehnání nebo hry zdarma (v2.5)")
+@app_commands.choices(typ=[
+    app_commands.Choice(name="Požehnání 🙏", value="blessing"),
+    app_commands.Choice(name="Hry zdarma 💵", value="freegames"),
+])
+async def setchannel_command(interaction: discord.Interaction, typ: str, kanál: discord.TextChannel):
+    """Nastav channel pro specifický účel (v2.5 – Channel Config Pack)."""
+    try:
+        # Kontroluj, že je uživatel admin
+        if not interaction.user.guild_permissions.administrator:
+            await interaction.response.send_message("❌ Musíš být администратор!")
+            return
+        
+        # Ulož konfiguraci do bot_data.json
+        db = _load_data()
+        await _save_guild_config_to_db(db, interaction.guild.id, typ, kanál.id)
+        
+        # Potvrzení
+        typ_jmeno = {"blessing": "Požehnání", "freegames": "Hry zdarma"}.get(typ, typ)
+        embed = discord.Embed(
+            title="✅ Kanál nastaven!",
+            description=f"**{typ_jmeno}** → {kanál.mention}",
+            color=discord.Color.green()
+        )
+        await interaction.response.send_message(embed=embed)
+        print(f"[config] Guild {interaction.guild.id}: {typ} → {kanál.id} (uloženo)")
+        
+    except Exception as e:
+        await interaction.response.send_message(f"❌ Chyba: {str(e)[:100]}")
+
+@bot.tree.command(name="config", description="Zobraz konfiguraci serveru (v2.5)")
+async def config_command(interaction: discord.Interaction):
+    """Zobraz aktuální konfiguraci serveru (v2.5 – Channel Config Pack)."""
+    try:
+        # Kontroluj, že je uživatel admin
+        if not interaction.user.guild_permissions.administrator:
+            await interaction.response.send_message("❌ Musíš být администратор!")
+            return
+        
+        # Načti konfiguraci z bot_data.json
+        db = _load_data()
+        config = _get_guild_all_config(db, interaction.guild.id)
+        
+        # Přeformátuj na jména kanálů
+        blessing_channel = interaction.guild.get_channel(config.get("blessing_channel"))
+        freegames_channel = interaction.guild.get_channel(config.get("freegames_channel"))
+        
+        blessing_str = f"✅ {blessing_channel.mention}" if blessing_channel else "❌ Není nastaven"
+        freegames_str = f"✅ {freegames_channel.mention}" if freegames_channel else "❌ Není nastaven"
+        
+        embed = discord.Embed(
+            title="⚙️ Konfigurace serveru",
+            color=discord.Color.blue()
+        )
+        embed.add_field(name="🙏 Požehnání", value=blessing_str, inline=False)
+        embed.add_field(name="💵 Hry zdarma", value=freegames_str, inline=False)
+        embed.add_field(
+            name="💡 Tip",
+            value="Použij `/setchannel` pro změnu kanálů",
+            inline=False
+        )
+        
+        await interaction.response.send_message(embed=embed)
+        
+    except Exception as e:
+        await interaction.response.send_message(f"❌ Chyba: {str(e)[:100]}")
 
 # ═══════════════════════════════════════════════════════════════════════════════
 #                13. SCHEDULED TASKS – AUTOMATICKÉ ZPRÁVY
@@ -1413,7 +1528,8 @@ async def send_morning_message():
     now = datetime.datetime.now(pytz.timezone("Europe/Prague"))
     if now.hour == 9 and now.minute == 0:
         for guild in bot.guilds:
-            channel = discord.utils.get(guild.text_channels, name="požehnání🙏")
+            # v2.5: Použij nový config system s fallbackem na staré hledání
+            channel = _get_channel_for_type(guild, "blessing")
             if channel:
                 verse = random.choice(verses)
                 embed = discord.Embed(title="🌅 Dobré ráno!", description="Nechť tě Bůh požehná v novém dni!", color=discord.Color.orange())
@@ -1430,7 +1546,8 @@ async def send_night_message():
     now = datetime.datetime.now(pytz.timezone("Europe/Prague"))
     if now.hour == 22 and now.minute == 0:
         for guild in bot.guilds:
-            channel = discord.utils.get(guild.text_channels, name="požehnání🙏")
+            # v2.5: Použij nový config system s fallbackem na staré hledání
+            channel = _get_channel_for_type(guild, "blessing")
             if channel:
                 embed = discord.Embed(title="🌙 Dobrou noc!", description="Spi v pokoji Kristově. Zítřka tě čeká nový den plný příležitostí.", color=discord.Color.dark_blue())
                 try:
@@ -1445,7 +1562,8 @@ async def send_free_games():
     now = datetime.datetime.now(pytz.timezone("Europe/Prague"))
     if now.hour == 20 and now.minute == 10:
         for guild in bot.guilds:
-            channel = discord.utils.get(guild.text_channels, name="hry_zdarma💵")
+            # v2.5: Použij nový config system s fallbackem na staré hledání
+            channel = _get_channel_for_type(guild, "freegames")
             if channel:
                 try:
                     free_games = get_free_games()
@@ -1550,7 +1668,8 @@ async def on_presence_update(before, after):
             ])
         
         # Najdi kanál a odeslij blessing
-        channel = discord.utils.get(after.guild.text_channels, name="požehnání🙏")
+        # v2.5: Použij nový config system s fallbackem na staré hledání
+        channel = _get_channel_for_type(after.guild, "blessing")
         if channel and channel.permissions_for(after.guild.me).send_messages:
             msg = f"{after.name} právě hraje **{game_name}**. {blessing}"
             embed = discord.Embed(description=msg, color=discord.Color.gold())
@@ -1561,7 +1680,7 @@ async def on_presence_update(before, after):
             except Exception as send_err:
                 print(f"[presence] Failed to send: {send_err}")
         else:
-            print(f"[presence] Channel 'požehnání🙏' not found or no permissions")
+            print(f"[presence] Channel 'blessing' not found or no permissions")
     
     # Hra skončila
     elif before_game is not None and after_game is None:

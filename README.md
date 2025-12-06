@@ -1,13 +1,14 @@
 # ✝️ Ježíš Discord Bot – hudba, verše a hry zdarma 🙏
 
-**Verze:** v2.4.1 – Music Playlist & Shuffle | **Platform:** Raspberry Pi Ready
+**Verze:** v2.5 – Channel Config Pack | **Platform:** Raspberry Pi Ready
 
 Discord bot napsaný v Pythonu (discord.py), který umí:
 
-* 🎵 Přehrávat hudbu z URL (YouTube přes `yt-dlp`) do voice kanálu - s názvy skladeb, odhadem času fronty, blokaací duplicitních skladeb, a podporou playlistů
+* 🎵 Přehrávat hudbu z URL (YouTube přes `yt-dlp`) do voice kanálu - s názvy skladeb, odhadem času fronty, blokaací duplicitních skladeb, podporou playlistů a shuffle
 * 📖 Posílat ranní a večerní zprávy s biblickým veršem
 * 🙏 Žehnat hráčům při spuštění her a reagovat na společné hraní ve voice
 * 🎁 Každý večer publikovat „Hry zdarma" s embedem a Discord link previews
+* ⚙️ Konfigurovat kanály per-guild s `/setchannel` a `/config`
 * 🎮 Minihry s XP systémem (kviz, veršový duel, RNG požehnání)
 * ℹ️ Slash commands: `/komandy`, `/verze`, `/diag` s automatickým autocomplete
 
@@ -179,7 +180,7 @@ Voice práva v cílovém kanálu:
 
 ---
 
-## ⌨️ Příkazy (Slash Commands – v2.4)
+## ⌨️ Příkazy (Slash Commands – v2.5)
 
 Hezký přehled najdete v `/komandy`. Základ:
 
@@ -204,6 +205,11 @@ Hezký přehled najdete v `/komandy`. Základ:
 * `/freegames` – aktuální přehled free her (Epic Games)
 * `/bless @uživatel` – krátké osobní požehnání
 * `/komandy` – kompletní seznam příkazů
+
+### Admin (v2.5)
+
+* `/setchannel <typ> <kanál>` – Nastaví kanál pro "Požehnání" nebo "Hry zdarma" (admin-only)
+* `/config` – Zobrazí aktuální konfiguraci serveru (admin-only)
 
 ### Minihry & Hry (v2.4)
 
@@ -403,9 +409,9 @@ Předchozí verze! Zlepšení hudby a miniher:
 * ✅ Všechny funkce v2.3.2 zachovány (bez breaking changes)
 * ✅ Optimalizované pro multi-server i single-server nasazení
 
-### 🟩 v2.4.1 – Music Playlist & Shuffle (AKTUÁLNÍ VERZE)
+### 🟨 v2.4.1 – Music Playlist & Shuffle (LEGACY)
 
-Nyní aktivní! Playlist a shuffle funkcionalita:
+Předchozí verze! Playlist a shuffle funkcionalita:
 * ✅ **YouTube Album/Playlist v jednom kroku** – `/yt <playlist_url>` detekuje playlist a přidá všechny skladby najednou s duplikát-checkingem
 * ✅ **Zamíchání fronty** – Nový command `/shuffle` náhodně zamíchá pořadí skladeb ve frontě (aktuálně hraná skladba zůstane na místě)
 * ✅ **Odhad času playlistu** – Bot vypočítá a zobrazí celkový čas všech skladeb v playlistu před přidáním
@@ -414,13 +420,16 @@ Nyní aktivní! Playlist a shuffle funkcionalita:
 * ✅ Zpětná kompatibilita s v2.4 (vše funguje jako do teď)
 * ✅ YouTube přehrávání zůstává beze změn (stejně skvěle funguje!)
 
-### 🟨 v2.5 – Channel Config Pack (PLÁNOVANÉ)
+### 🟩 v2.5 – Channel Config Pack (AKTUÁLNÍ VERZE)
 
-* `/setchannel <typ> <kanál>` – rychlé nastavení kanálů
-* `/config` – přehled aktuální konfigurace serveru
-* Bezpečné ukládání nastavení per-guild
-* Validace perms a inteligentní hlášky
-* Čisté logování změn
+Nyní aktivní! Správa konfigurace per-guild:
+* ✅ **`/setchannel <typ> <kanál>`** – Rychlé nastavení kanálů (Požehnání, Hry zdarma)
+* ✅ **`/config`** – Přehled aktuální konfigurace serveru s admin-only přístupem
+* ✅ **Bezpečné ukládání nastavení** – Per-guild konfigurace v `bot_data.json` (centralizované)
+* ✅ **Validace oprávnění** – Pouze administrátoři mohou měnit konfiguraci
+* ✅ **Čisté logování** – Všechny změny jsou zaznamenány v konzoli
+* ✅ **Fallback na staré hledání** – Pokud není kanál nastaven, bot si vyhledá kanál podle jména
+* ✅ Zpětná kompatibilita se všemi předchozími verzemi
 
 ### 🟨 v2.6 – Free Games Engine 3.0 (PLÁNOVANÉ)
 
