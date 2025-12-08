@@ -163,6 +163,10 @@ bot = commands.Bot(command_prefix="/", intents=intents)
 DATA_FILE = pathlib.Path("bot_data.json")
 _data_lock = asyncio.Lock()
 
+# Game blessing cooldown (user_id -> {game_name -> timestamp})
+_game_blessing_cooldowns = {}
+GAME_BLESSING_COOLDOWN = 3600  # 1 hodina v sekundách
+
 def _load_data():
     if DATA_FILE.exists():
         try:
@@ -178,6 +182,30 @@ async def _save_data(db):
 def _g(db, gid, key, default):
     """Guild-specific data namespace"""
     return db.setdefault(str(gid), {}).setdefault(key, default)
+
+def _can_send_game_blessing(user_id: int, game_name: str) -> bool:
+    """Zkontroluj jestli je game blessing na cooldown."""
+    now = time.time()
+    
+    # Inicializuj user v cooldownech
+    if user_id not in _game_blessing_cooldowns:
+        _game_blessing_cooldowns[user_id] = {}
+    
+    user_cooldowns = _game_blessing_cooldowns[user_id]
+    
+    # Zkontroluj jestli je hra na cooldownu
+    if game_name in user_cooldowns:
+        last_blessing_time = user_cooldowns[game_name]
+        elapsed = now - last_blessing_time
+        
+        if elapsed < GAME_BLESSING_COOLDOWN:
+            remaining = GAME_BLESSING_COOLDOWN - elapsed
+            print(f"[game_blessing] {user_id} -> {game_name}: Cooldown - zbývá {remaining:.1f}s")
+            return False
+    
+    # Blessing je povolený, zaznamenej čas
+    user_cooldowns[game_name] = now
+    return True
 
 def _get_guild_all_config(db, gid: int) -> dict:
     """Vrátí kompletní konfiguraci pro guild z bot_data.json (v2.5)."""
@@ -1655,6 +1683,12 @@ async def on_presence_update(before, after):
         # Tímto způsobem resetujeme last_update a NEpočítáme čas od staré aktualizace
         track_user_activity(after, reset_on_new_game=True)
         await assign_game_roles(after)
+        
+        # Zkontroluj game blessing cooldown (1 hodina na hru)
+        # Pokud je hra na cooldownu, neposílej blessing
+        if not _can_send_game_blessing(after.id, game_name):
+            print(f"[presence] {game_name} blessing na cooldownu pro {after.name}, přeskakuji")
+            return
         
         # Vyber blessing
         if game_name in game_blessings:
