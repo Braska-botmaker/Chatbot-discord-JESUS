@@ -838,23 +838,6 @@ async def on_ready():
         await save_user_xp_to_storage()
         print("[xp-fix] ✅ user_xp resetován (anomální data)")
     
-    # 🔧 FIX v2.3.1: Detekuj a resetuj anomální game hours (bug byla multipliciter počítání)
-    # Pokud existují hry s >24h (anomální - game ještě není na serveru den), reset
-    reset_needed = False
-    for user_id, user_data in list(game_activity.items()):
-        for game_name, hours in user_data.get("games", {}).items():
-            if hours > 24:  # Anomální vysoká čísla
-                print(f"[bug-fix] Detekován bug: {game_name} má {hours:.1f}h (anomální). Resetuji game_activity...")
-                reset_needed = True
-                break
-        if reset_needed:
-            break
-    
-    if reset_needed:
-        game_activity.clear()
-        await save_game_activity_to_storage()
-        print("[bug-fix] ✅ game_activity resetován. Verse streak zachován.")
-    
     try:
         synced = await bot.tree.sync()
         print(f"[commands] Synced {len(synced)} slash commands")
@@ -1892,12 +1875,22 @@ biblical_quiz_questions = [
 
 def get_user_level(xp: int) -> str:
     """Vrátí level na základě XP."""
-    if xp < 100:
+    if xp < 50:
+        return "🌱 Nováček"
+    elif xp < 100:
         return "🔰 Učedník"
-    elif xp < 300:
+    elif xp < 200:
+        return "📖 Věřící"
+    elif xp < 350:
         return "📜 Prorok"
-    else:
+    elif xp < 500:
+        return "⚔️ Bojovník"
+    elif xp < 750:
+        return "🦁 Lev Judův"
+    elif xp < 1000:
         return "👑 Apoštol"
+    else:
+        return "💎 Messiáš"
 
 @bot.tree.command(name="biblickykviz", description="Biblický trivia kviz – 10 otázek")
 async def biblickykviz_command(interaction: discord.Interaction):
@@ -2268,8 +2261,11 @@ async def assign_game_roles(member: discord.Member):
     # Najdi nebo vytvoř role - s lockem aby se nekonfliktovaly
     role_names = {
         "gamer": "🎮 Gamer",
+        "hardcore_gamer": "🔥 Hardcore Gamer",
         "night_warrior": "🌙 Night Warrior",
-        "weekend_crusader": "⛪ Weekend Crusader"
+        "weekend_crusader": "⛪ Weekend Crusader",
+        "no_lifer": "💀 No Lifer",
+        "collector": "🎯 Collector"
     }
     
     # Kalkuluj game hours a přiřaď role
@@ -2297,6 +2293,55 @@ async def assign_game_roles(member: discord.Member):
                         await member.add_roles(role)
                     except Exception as e:
                         print(f"[roles] Error adding role: {e}")
+            
+            # 🔥 Hardcore Gamer role (10+ hodin hraní)
+            if total_hours >= 10:
+                role = discord.utils.get(guild.roles, name=role_names["hardcore_gamer"])
+                if not role:
+                    try:
+                        role = await guild.create_role(name=role_names["hardcore_gamer"], color=discord.Color.red())
+                        print(f"[roles] Created 🔥 Hardcore Gamer role in {guild.name}")
+                    except Exception as e:
+                        print(f"[roles] Error creating Hardcore Gamer role: {e}")
+                
+                if role and role not in member.roles:
+                    try:
+                        await member.add_roles(role)
+                    except Exception as e:
+                        print(f"[roles] Error adding Hardcore Gamer role: {e}")
+            
+            # 💀 No Lifer role (70+ hodin hraní dohromady)
+            if total_hours >= 70:
+                role = discord.utils.get(guild.roles, name=role_names["no_lifer"])
+                if not role:
+                    try:
+                        role = await guild.create_role(name=role_names["no_lifer"], color=discord.Color.darker_gray())
+                        print(f"[roles] Created 💀 No Lifer role in {guild.name}")
+                    except Exception as e:
+                        print(f"[roles] Error creating No Lifer role: {e}")
+                
+                if role and role not in member.roles:
+                    try:
+                        await member.add_roles(role)
+                    except Exception as e:
+                        print(f"[roles] Error adding No Lifer role: {e}")
+            
+            # 🎯 Collector role (10+ různých her)
+            num_games = len(user_data["games"])
+            if num_games >= 10:
+                role = discord.utils.get(guild.roles, name=role_names["collector"])
+                if not role:
+                    try:
+                        role = await guild.create_role(name=role_names["collector"], color=discord.Color.gold())
+                        print(f"[roles] Created 🎯 Collector role in {guild.name}")
+                    except Exception as e:
+                        print(f"[roles] Error creating Collector role: {e}")
+                
+                if role and role not in member.roles:
+                    try:
+                        await member.add_roles(role)
+                    except Exception as e:
+                        print(f"[roles] Error adding Collector role: {e}")
             
             # 🌙 Night Warrior role (hrajou po 23:00)
             if member.activity and datetime.datetime.now().hour >= 23:
