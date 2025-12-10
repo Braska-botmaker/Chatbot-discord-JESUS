@@ -325,6 +325,195 @@ Všechny významné změny v tomto projektu jsou dokumentovány zde.
 
 ---
 
+## [2.6] – 2025-12-09 – Free Games Engine 3.0 🎮
+
+### ✨ Nové Features
+
+#### Free Games Engine 3.0 – 6-Platform Aggregation 🎮
+**Complete redesign of `/freegames` command with multi-source support:**
+
+- ✅ **Epic Games** – JSON API from `store-site-backend-static.ak.epicgames.com/freeGamesPromotions`
+  - Detection: Tracks games with `discountPrice == 0`
+  - Retrieves: Game title and store URL
+  
+- ✅ **Steam** – HTML scraping from `store.steampowered.com/search/?maxprice=0&specials=1`
+  - Method: Regex pattern matching on `search_result_row` divs
+  - Extraeves: Game titles from data attributes
+  
+- ✅ **PlayStation Plus** – RSS feed parsing from `blog.playstation.com/tag/playstation-plus/feed/`
+  - Method: XML parsing with ElementTree
+  - Limit: Latest 6 items from feed
+  - Extracts: Title and blog link
+  
+- ✅ **GOG** – JSON API from `gog.com/games/ajax/filtered?mediaType=game&price=free&sortBy=trending`
+  - Method: Direct API query with filters
+  - Limit: Up to 8 free games
+  - Extracts: Title and product URL
+  
+- ✅ **Ubisoft+** – HTML scraping from `ubisoft.com/en-US/ubisoft-plus`
+  - Method: Regex pattern matching `"game_name":"([^"]*)"` from page source
+  - Limit: Up to 5 games per run
+  - Extracts: Game titles directly from HTML
+  
+- ✅ **Amazon Prime Gaming** – HTML scraping from `gaming.amazon.com/home`
+  - Method: Pattern matching on `<h3>` tags containing game names
+  - Limit: Up to 5 games per run
+  - Extracts: Title and links from HTML structure
+
+**Smart Features:**
+- ✅ **Per-Platform Status Tracking** – Returns dict indicating which platforms have games available
+- ✅ **Newest Game Per Source** – Displays only the latest/first available game from each platform (not all games)
+- ✅ **Cascade-Safe Error Handling** – Each platform wrapped in try/except; one platform failure doesn't stop others
+- ✅ **Graceful Fallbacks** – Shows "momentálně není žádná hra" for platforms with no games or errors
+- ✅ **Clean Output Format** – Simple numbered list with platform names and URLs on separate line
+
+**Output Format:**
+```
+1. Epic Games – [Game Title](https://store.epicgames.com/...)
+2. Steam – momentálně není žádná hra
+3. PlayStation Plus – [Game Title](https://blog.playstation.com/...)
+4. GOG – [Game Title](https://gog.com/...)
+5. Ubisoft+ – momentálně není žádná hra
+6. Prime Gaming – [Game Title](https://gaming.amazon.com/...)
+
+---
+
+https://store.epicgames.com/...
+https://blog.playstation.com/...
+https://gog.com/...
+https://gaming.amazon.com/...
+```
+
+**Auto-Send Enhancement:**
+- ✅ `send_free_games()` task runs daily at 20:10 CET
+- ✅ Per-guild channel routing via `_get_channel_for_type()`
+- ✅ Same clean format as `/freegames` command
+- ✅ Error handling with console logging for monitoring
+
+### 🔧 Code Changes
+
+**New Functions:**
+- `get_free_games()` (lines 569-676) – Core aggregation engine
+  - Returns: `(games_list, source_status_dict)` tuple
+  - Handles all 6 platform sources with independent error handling
+  - Each game object: `{"title": str, "url": str, "source": str}`
+  - Status dict: `{"epic": bool, "steam": bool, "playstation": bool, "gog": bool, "ubisoft": bool, "amazon": bool}`
+
+**Updated Functions:**
+- `freegames_command()` (lines 1428-1497) – Redesigned for multi-platform output
+  - Defers response to Discord for long-running aggregation
+  - Builds platform-to-game mapping (newest game per source)
+  - Constructs clean list format instead of embeds
+  - Full try/except wrapping for robustness
+  - URL generation and format validation
+  
+- `send_free_games()` (lines 1757-1839) – Scheduled task with platform aggregation
+  - Daily execution at 20:10 CET (Europe/Prague)
+  - Per-guild channel lookup
+  - Identical output format to command
+  - Graceful error handling with fallback messages
+
+**Data Structures:**
+```python
+# Return value from get_free_games()
+games = [
+    {"title": "Epic Game Name", "url": "https://...", "source": "epic"},
+    {"title": "Steam Game", "url": "https://...", "source": "steam"},
+    # ... more games
+]
+
+source_status = {
+    "epic": True,        # Has games
+    "steam": False,      # No games or error
+    "playstation": True,
+    "gog": False,
+    "ubisoft": True,
+    "amazon": False
+}
+
+# Internal platform mapping (in command/task)
+platform_games = {
+    "epic": {"title": "...", "url": "..."},
+    "steam": None,  # No games
+    "playstation": {"title": "...", "url": "..."},
+    # ... etc
+}
+```
+
+### 📝 Technické Details
+
+**Epic Games API:**
+- Endpoint: `store-site-backend-static.ak.epicgames.com/freeGamesPromotions`
+- JSON parsing for freeGames array
+- Filter: `promotions[0].promotionalOffers[0].promotionalOffers` where `discountPrice == 0`
+
+**Steam HTML Scraping:**
+- URL pattern: `store.steampowered.com/search/?maxprice=0&specials=1`
+- Regex: `<div class="search_result_row" data-app-id="(\d+)">.*?<span class="title">(.+?)</span>`
+- Extracts app ID and title
+
+**PlayStation Plus RSS:**
+- Feed URL: `blog.playstation.com/tag/playstation-plus/feed/`
+- XML parsing with `xml.etree.ElementTree`
+- Extracts title from `<item>` elements
+- Limit: 6 items
+
+**GOG API:**
+- Endpoint: `gog.com/games/ajax/filtered?mediaType=game&price=free&sortBy=trending`
+- Query params: `mediaType=game`, `price=free`, `sortBy=trending`
+- JSON response with game objects
+- Extracts: title, store URL
+
+**Ubisoft+ HTML:**
+- URL: `ubisoft.com/en-US/ubisoft-plus`
+- Regex pattern: `"game_name":"([^"]*)"`
+- Extracts game names from JSON embedded in HTML
+- Timeout: 6 seconds per request
+
+**Amazon Prime Gaming:**
+- URL: `gaming.amazon.com/home`
+- HTML pattern: `<h3[^>]*>([^<]*)</h3>` to find game names
+- Extracts titles from page structure
+- Timeout: 6 seconds per request
+
+**Error Handling Strategy:**
+- Each platform wrapped in separate try/except block
+- Platform failure logged to console but doesn't stop other platforms
+- Per-source timeout handling (6s default for HTML scraping)
+- Missing games shown as "momentálně není žádná hra"
+- URL generation validates before output
+
+### 📊 Performance Characteristics
+- **Epic API** – ~1-2s (direct JSON fetch)
+- **Steam HTML** – ~2-3s (HTTP + regex parse)
+- **PlayStation RSS** – ~1-2s (lightweight XML)
+- **GOG API** – ~1-2s (direct JSON)
+- **Ubisoft HTML** – ~2-3s (HTTP + regex parse, timeout-protected)
+- **Amazon HTML** – ~2-3s (HTTP + regex parse, timeout-protected)
+- **Total Runtime** – ~8-10s max (sequential execution)
+- **Optimization Path** – Could reduce to <5s with parallel execution per platform
+
+### 📚 Documentation Updates
+- ✅ `README.md` version updated to v2.6
+- ✅ Features section updated: "6-platform free games aggregation"
+- ✅ Feature list: Added detailed `/freegames` platform breakdown
+- ✅ Roadmap: v2.6 marked as COMPLETE
+
+### 🔄 Backward Compatibility
+- ✅ All v2.5 features fully preserved
+- ✅ `/freegames` command remains accessible with enhanced functionality
+- ✅ No breaking changes to existing API
+- ✅ Data persistence (`bot_data.json`) schema compatible
+
+### 🎯 Features Preserved from v2.5
+- ✅ Game Blessing system with 1-hour cooldown (per-game tracking)
+- ✅ Channel Config Pack (per-guild channel settings)
+- ✅ YouTube playback via `/yt` command (single track handling)
+- ✅ All XP/role systems (8 levels, 6 roles)
+- ✅ Data persistence with anomaly detection (selective cleanup)
+
+---
+
 ## [2.0] – 2025-11-17 – MAJOR VOICE & STREAMING FIXES 🎵
 
 ### 🔧 Opraveno

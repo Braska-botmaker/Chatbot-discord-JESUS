@@ -207,6 +207,39 @@ def _can_send_game_blessing(user_id: int, game_name: str) -> bool:
     user_cooldowns[game_name] = now
     return True
 
+# ═══════════════════════════════════════════════════════════════════════════════
+#                    SLEDOVÁNÍ KONČÍCÍCH HER (v2.6)
+# ═══════════════════════════════════════════════════════════════════════════════
+_free_games_cache = {}  # {"game_title": {"expires_at": timestamp, "source": "Epic", ...}}
+_free_games_last_update = 0
+
+def _check_expiring_games():
+    """Kontroluj které hry brzy expirují (za <7 dní) a vrať je."""
+    global _free_games_cache, _free_games_last_update
+    
+    now = datetime.datetime.now(datetime.timezone.utc).timestamp()
+    
+    # Aktualizuj cache každých 6 hodin
+    if now - _free_games_last_update < 21600:  # 6 hodin
+        return {}
+    
+    # Příliš komplexní - raději se obejdem bez tracking expiration
+    # (API to nevrací - museli bychom scrapovat stránky)
+    # Zatím ignorujeme, stačí základní status per-source
+    return {}
+
+def _get_expiring_games_message():
+    """Vrátí message pro upozornění na končící hry, pokud existují."""
+    expiring = _check_expiring_games()
+    if not expiring:
+        return None
+    
+    msg = "⏰ **Upozornění na končící hry:**\n"
+    for game, info in list(expiring.items())[:3]:
+        days_left = (info.get("expires_at", 0) - datetime.datetime.now(datetime.timezone.utc).timestamp()) / 86400
+        msg += f"- {game} ({info.get('source', 'Unknown')}): {int(days_left)} dní zbývá\n"
+    return msg if len(expiring) > 0 else None
+
 def _get_guild_all_config(db, gid: int) -> dict:
     """Vrátí kompletní konfiguraci pro guild z bot_data.json (v2.5)."""
     guild_data = _g(db, gid, "config", {})
@@ -567,12 +600,20 @@ async def play_next(guild: discord.Guild, text_channel: discord.TextChannel):
 # ═══════════════════════════════════════════════════════════════════════════════
 
 def get_free_games():
-    """Sbírá zdarma hry z více zdrojů: Epic, Steam (free na 0), PlayStation Blog.
+    """Sbírá zdarma hry z více zdrojů: Epic, Steam, PlayStation, GOG, Ubisoft+, Amazon Prime Gaming.
     
-    Vrací seznam dict s 'title' a 'url'. Deduplikuje podle (title, url).
+    Vrací tuple: (list her s info, dict source_status)
     """
     games = []
     seen = set()
+    source_status = {
+        "epic": False,
+        "steam": False,
+        "playstation": False,
+        "gog": False,
+        "ubisoft": False,
+        "amazon": False
+    }
 
     # ═══ EPIC GAMES ═══
     try:
@@ -603,7 +644,8 @@ def get_free_games():
                                                 key = (title, url)
                                                 if key not in seen:
                                                     seen.add(key)
-                                                    games.append({"title": title, "url": url})
+                                                    games.append({"title": title, "url": url, "source": "Epic"})
+                                                    source_status["epic"] = True
                                 except Exception:
                                     continue
     except Exception as e:
@@ -611,12 +653,10 @@ def get_free_games():
 
     # ═══ STEAM ═══
     try:
-        # Steam special discounts na 0 - hledáme hry slevněné z nějaké ceny na 0
         steam_url = "https://store.steampowered.com/search/?maxprice=0&specials=1"
         r = requests.get(steam_url, timeout=6, headers={"User-Agent": "Mozilla/5.0"})
         html = r.text
         
-        # Hledej search_result_row s titulem a URL
         pattern = re.compile(
             r'<a[^>]+class="search_result_row[^"]*"[^>]+href="(?P<href>[^"]+)"[^>]*>.*?<span class="title">(?P<title>.*?)</span>',
             re.DOTALL
@@ -629,8 +669,12 @@ def get_free_games():
             key = (title, href)
             if key not in seen and count < 12:
                 seen.add(key)
-                games.append({"title": title, "url": href})
+                games.append({"title": title, "url": href, "source": "Steam"})
                 count += 1
+                source_status["steam"] = True
+        
+        if count == 0:
+            print("[freegames] Steam: Žádné hry zdarma momentálně")
     except Exception as e:
         print(f"[freegames] Steam error: {e}")
 
@@ -650,13 +694,83 @@ def get_free_games():
                     key = (title, link)
                     if key not in seen:
                         seen.add(key)
-                        games.append({"title": title, "url": link})
+                        games.append({"title": title, "url": link, "source": "PlayStation"})
+                        source_status["playstation"] = True
             except Exception as e:
                 print(f"[freegames] PlayStation parse error: {e}")
     except Exception as e:
         print(f"[freegames] PlayStation error: {e}")
 
-    return games
+    # ═══ GOG ═══
+    try:
+        gog_url = "https://www.gog.com/games/ajax/filtered?mediaType=game&price=free&sortBy=trending"
+        r = requests.get(gog_url, timeout=6, headers={"User-Agent": "Mozilla/5.0"})
+        data = r.json()
+        
+        if isinstance(data, dict) and "products" in data:
+            products = data.get("products", [])
+            if isinstance(products, list):
+                for product in products[:8]:
+                    if isinstance(product, dict):
+                        title = product.get("title", "Unknown").strip()
+                        url = product.get("url", "")
+                        if url:
+                            full_url = f"https://gog.com{url}" if url.startswith("/") else url
+                            key = (title, full_url)
+                            if key not in seen:
+                                seen.add(key)
+                                games.append({"title": title, "url": full_url, "source": "GOG"})
+                                source_status["gog"] = True
+    except Exception as e:
+        print(f"[freegames] GOG error: {e}")
+
+    # ═══ UBISOFT+ ═══
+    try:
+        # Ubisoft+ Free Games - scrapování z Ubisoft stránky
+        ubisoft_url = "https://www.ubisoft.com/en-US/ubisoft-plus"
+        r = requests.get(ubisoft_url, timeout=6, headers={"User-Agent": "Mozilla/5.0"})
+        html = r.text
+        
+        # Hledej free games v datech
+        pattern = re.compile(r'"game_name":"([^"]+)".*?"image_url":"([^"]+)"', re.DOTALL)
+        count = 0
+        for m in pattern.finditer(html):
+            title = m.group(1).strip()
+            # Ubisoft+ všechny hry "free"
+            if title:
+                url = "https://www.ubisoft.com/en-US/ubisoft-plus"
+                key = (f"Ubisoft+ - {title}", url)
+                if key not in seen and count < 5:
+                    seen.add(key)
+                    games.append({"title": f"Ubisoft+ - {title}", "url": url, "source": "Ubisoft+"})
+                    count += 1
+                    source_status["ubisoft"] = True
+    except Exception as e:
+        print(f"[freegames] Ubisoft+ error: {e}")
+
+    # ═══ AMAZON PRIME GAMING ═══
+    try:
+        amazon_url = "https://gaming.amazon.com/home"
+        r = requests.get(amazon_url, timeout=6, headers={"User-Agent": "Mozilla/5.0"})
+        html = r.text
+        
+        # Hledej free games v datech
+        pattern = re.compile(r'<h3[^>]*>([^<]+)</h3>.*?Prime Gaming', re.DOTALL)
+        count = 0
+        for m in pattern.finditer(html):
+            title = m.group(1).strip()
+            if title and len(title) > 2:
+                url = "https://gaming.amazon.com/home"
+                key = (f"Prime Gaming - {title}", url)
+                if key not in seen and count < 5:
+                    seen.add(key)
+                    games.append({"title": f"Prime Gaming - {title}", "url": url, "source": "Prime Gaming"})
+                    count += 1
+                    source_status["amazon"] = True
+    except Exception as e:
+        print(f"[freegames] Amazon Prime Gaming error: {e}")
+
+    return games, source_status
 
 verse_streak = {}  # {user_id: {"count": int, "last_date": date}}
 streak_messages = {
@@ -1310,39 +1424,87 @@ async def verse_command(interaction: discord.Interaction):
     except Exception as e:
         await interaction.response.send_message(f"❌ Chyba: {str(e)[:100]}")
 
-@bot.tree.command(name="freegames", description="Hry zdarma – Epic Games, Steam, PlayStation")
+@bot.tree.command(name="freegames", description="Hry zdarma – Epic Games, Steam, PlayStation, GOG, Ubisoft+, Amazon Prime")
 async def freegames_command(interaction: discord.Interaction):
-    """Show free games from Epic Games Store, Steam, and PlayStation."""
+    """Show free games from multiple platforms with per-source status."""
     await interaction.response.defer()
     try:
-        free_games = get_free_games()
-        if not free_games:
-            await interaction.followup.send("❌ Momentálně nejsou k dispozici žádné hry zdarma.")
-            return
+        free_games, source_status = get_free_games()
         
-        # Vytvoř strukturovaný text s odkazy
+        # Mapování zdrojů na názvy
+        source_names = {
+            "epic": "Epic Games",
+            "steam": "Steam",
+            "playstation": "PlayStation Plus",
+            "gog": "GOG",
+            "ubisoft": "Ubisoft+",
+            "amazon": "Prime Gaming"
+        }
+        
+        # Vytvářej seznam: {source_name: url} nebo {source_name: None}
+        platform_games = {}
+        for source in source_names.keys():
+            platform_games[source] = None
+        
+        # Najdi nejnovější (poslední) hru z každé platformy
+        for game in free_games:
+            source = game.get("source", "").lower()
+            url = game.get("url", "")
+            title = game.get("title", "Unknown")
+            
+            # Mapuj na klíč
+            for key in platform_games.keys():
+                if source.startswith(key) or key in source.lower():
+                    if platform_games[key] is None:  # Jen první (nejnovější) z každé
+                        platform_games[key] = {"title": title, "url": url}
+                    break
+        
+        # Vytvoř embed se všemi platformami
         description_lines = []
-        urls_for_previews = []
-        for i, game in enumerate(free_games[:15], 1):
-            description_lines.append(f"{i}. [{game['title']}]({game['url']})")
-            urls_for_previews.append(game['url'])
+        urls_for_preview = []
+        
+        counter = 1
+        for source_key in ["epic", "steam", "playstation", "gog", "ubisoft", "amazon"]:
+            source_name = source_names.get(source_key, source_key)
+            game_info = platform_games.get(source_key)
+            
+            if game_info and game_info.get("url"):
+                title = game_info.get("title", "Unknown")
+                url = game_info.get("url", "")
+                description_lines.append(f"{counter}. {source_name} – [{title}]({url})")
+                urls_for_preview.append(url)
+            else:
+                description_lines.append(f"{counter}. {source_name} – momentálně není žádná hra")
+            
+            counter += 1
         
         description = "\n".join(description_lines)
         
         # Vytvoř embed
-        embed = discord.Embed(title="🎁 Hry Zdarma", description=description, color=discord.Color.purple())
-        embed.set_footer(text="Hry se mění měsíčně. Náhledy se načítají pod embedem...")
+        embed = discord.Embed(
+            title="🎁 Hry Zdarma",
+            description=description,
+            color=discord.Color.purple()
+        )
         
         # Pošli embed
         await interaction.followup.send(embed=embed)
         
-        # Pošli bare URLs pro Discord link previews
-        if urls_for_previews:
-            urls_message = "\n".join(urls_for_previews)
-            await interaction.followup.send(urls_message)
+        # Pošli nejnovější URL z každé platformy (Discord previews)
+        if urls_for_preview:
+            try:
+                urls_message = "---\n\n" + "\n".join(urls_for_preview)
+                await interaction.followup.send(urls_message)
+            except Exception as e:
+                print(f"[freegames] Error sending URLs: {e}")
+                
     except Exception as e:
-        print(f"[freegames] Error: {type(e).__name__}: {e}")
-        await interaction.followup.send(f"❌ Chyba při načítání her: {str(e)[:80]}")
+        print(f"[freegames] Command error: {type(e).__name__}: {e}")
+        try:
+            await interaction.followup.send(f"❌ Chyba: {str(e)[:100]}")
+        except Exception as send_error:
+            print(f"[freegames] Failed to send error message: {send_error}")
+
 
 @bot.tree.command(name="bless", description="Požehnání pro uživatele")
 async def bless_command(interaction: discord.Interaction, user: discord.User = None):
@@ -1569,42 +1731,93 @@ async def send_night_message():
 
 @tasks.loop(minutes=1)
 async def send_free_games():
-    """Odeslat zdarma hry v 20:10 CET."""
+    """Odeslat zdarma hry v 20:10 CET s per-platformou (v2.6)."""
     now = datetime.datetime.now(pytz.timezone("Europe/Prague"))
     if now.hour == 20 and now.minute == 10:
         for guild in bot.guilds:
             # v2.5: Použij nový config system s fallbackem na staré hledání
             channel = _get_channel_for_type(guild, "freegames")
-            if channel:
-                try:
-                    free_games = get_free_games()
-                    if not free_games:
-                        continue
+            if not channel:
+                continue
+            
+            try:
+                free_games, source_status = get_free_games()
+                
+                # Mapování zdrojů na názvy
+                source_names = {
+                    "epic": "Epic Games",
+                    "steam": "Steam",
+                    "playstation": "PlayStation Plus",
+                    "gog": "GOG",
+                    "ubisoft": "Ubisoft+",
+                    "amazon": "Prime Gaming"
+                }
+                
+                # Vytvářej seznam: {source_name: url} nebo {source_name: None}
+                platform_games = {}
+                for source in source_names.keys():
+                    platform_games[source] = None
+                
+                # Najdi nejnovější (poslední) hru z každé platformy
+                for game in free_games:
+                    source = game.get("source", "").lower()
+                    url = game.get("url", "")
+                    title = game.get("title", "Unknown")
                     
-                    # Vytvoř strukturovaný text s odkazy
-                    description_lines = []
-                    urls_for_previews = []
-                    for i, game in enumerate(free_games[:15], 1):
-                        description_lines.append(f"{i}. [{game['title']}]({game['url']})")
-                        urls_for_previews.append(game['url'])
+                    # Mapuj na klíč
+                    for key in platform_games.keys():
+                        if source.startswith(key) or key in source.lower():
+                            if platform_games[key] is None:  # Jen první (nejnovější) z každé
+                                platform_games[key] = {"title": title, "url": url}
+                            break
+                
+                # Vytvoř embed se všemi platformami
+                description_lines = []
+                urls_for_preview = []
+                
+                counter = 1
+                for source_key in ["epic", "steam", "playstation", "gog", "ubisoft", "amazon"]:
+                    source_name = source_names.get(source_key, source_key)
+                    game_info = platform_games.get(source_key)
                     
-                    description = "\n".join(description_lines)
+                    if game_info and game_info.get("url"):
+                        title = game_info.get("title", "Unknown")
+                        url = game_info.get("url", "")
+                        description_lines.append(f"{counter}. {source_name} – [{title}]({url})")
+                        urls_for_preview.append(url)
+                    else:
+                        description_lines.append(f"{counter}. {source_name} – momentálně není žádná hra")
                     
-                    # Vytvoř embed
-                    embed = discord.Embed(title="🎁 Hry Zdarma", description=description, color=discord.Color.purple())
-                    embed.set_footer(text="Hry se mění měsíčně.")
-                    
-                    # Pošli embed
-                    await channel.send(embed=embed)
-                    
-                    # Pošli bare URLs pro Discord link previews
-                    if urls_for_previews:
-                        urls_message = "\n".join(urls_for_previews)
+                    counter += 1
+                
+                description = "\n".join(description_lines)
+                
+                # Vytvoř embed
+                embed = discord.Embed(
+                    title="🎁 Hry Zdarma",
+                    description=description,
+                    color=discord.Color.purple()
+                )
+                
+                # Pošli embed
+                await channel.send(embed=embed)
+                
+                # Pošli nejnovější URL z každé platformy (Discord previews)
+                if urls_for_preview:
+                    try:
+                        urls_message = "---\n\n" + "\n".join(urls_for_preview)
                         await channel.send(urls_message)
-                    
-                    print(f"[send_free_games] Sent to {guild.name}")
-                except Exception as e:
-                    print(f"[send_free_games] Error in {guild.name}: {e}")
+                    except Exception as e:
+                        print(f"[send_free_games] Error sending URLs in {guild.name}: {e}")
+                
+                print(f"[send_free_games] Sent to {guild.name}")
+                
+            except Exception as e:
+                print(f"[send_free_games] Error in {guild.name}: {type(e).__name__}: {e}")
+                try:
+                    await channel.send(f"❌ Chyba při načítání her: {str(e)[:100]}")
+                except Exception as send_error:
+                    print(f"[send_free_games] Failed to send error message in {guild.name}: {send_error}")
 
 @tasks.loop(minutes=5)
 async def voice_watchdog():

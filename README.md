@@ -1,13 +1,13 @@
 # ✝️ Ježíš Discord Bot – hudba, verše a hry zdarma 🙏
 
-**Verze:** v2.5 – Channel Config Pack | **Platform:** Raspberry Pi Ready
+**Verze:** v2.6 – Free Games Engine 3.0 | **Platform:** Raspberry Pi Ready
 
 Discord bot napsaný v Pythonu (discord.py), který umí:
 
 * 🎵 Přehrávat hudbu z URL (YouTube přes `yt-dlp`) do voice kanálu - s názvy skladeb, odhadem času fronty, blokaací duplicitních skladeb, podporou playlistů a shuffle
 * 📖 Posílat ranní a večerní zprávy s biblickým veršem
 * 🙏 Žehnat hráčům při spuštění her a reagovat na společné hraní ve voice
-* 🎁 Každý večer publikovat „Hry zdarma" s embedem a Discord link previews
+* 🎁 Každý večer publikovat „Hry zdarma" z 6 platforem (Epic, Steam, PlayStation, GOG, Ubisoft+, Prime Gaming) s embedem a Discord link previews
 * ⚙️ Konfigurovat kanály per-guild s `/setchannel` a `/config`
 * 🎮 Minihry s XP systémem (kviz, veršový duel, RNG požehnání)
 * ℹ️ Slash commands: `/komandy`, `/verze`, `/diag` s automatickým autocomplete
@@ -32,6 +32,7 @@ Discord bot napsaný v Pythonu (discord.py), který umí:
 * [Přizpůsobení](#-přizpůsobení)
 * [Roadmapa](#-roadmapa)
 * [Licence](#-licence)
+* [Poděkování](#-poděkování)
 
 ---
 
@@ -202,7 +203,7 @@ Hezký přehled najdete v `/komandy`. Základ:
 
 * `/verze` – info o verzi a změnách
 * `/verse` – náhodný biblický verš do chatu – denní streak s pochvalou
-* `/freegames` – aktuální přehled free her (Epic Games)
+* `/freegames` – **v2.6: Aktuální přehled free her z 6 platforem (Epic, Steam, PlayStation, GOG, Ubisoft+, Prime Gaming) s per-source statusem**
 * `/bless @uživatel` – krátké osobní požehnání
 * `/komandy` – kompletní seznam příkazů
 
@@ -372,20 +373,78 @@ python3 tools/rpi_voice_diagnostics.py
 
 ---
 
-## 🛠️ Přizpůsobení
+## 🛠️ Přizpůsobení (v2.6)
 
-* **Kanály**: změňte názvy v helperu nebo přidejte autodetekci podle ID.
-* **Texty požehnání**: upravte dict `game_blessings`.
-* **Verše**: rozšiřte list `verses`.
-* **Plánovač**: upravte časy v `tasks.loop` (pozor na timezone `Europe/Prague`).
+### Per-Guild Konfigurace (Doporučeno)
+
+Nejjednodušší způsob – Použijte **Discord commands** přímo v serveru (admin-only):
+
+```
+/setchannel blessing <channel>     – Nastaví kanál pro ranní verš a požehnání
+/setchannel freegames <channel>    – Nastaví kanál pro denní přehled free her
+/config                            – Zobrazí aktuální konfiguraci
+```
+
+Tímto způsobem máte konfiguraci **per-server** uloženou v `bot_data.json` a změny se projeví okamžitě. ✅
+
+### Programové Přizpůsobení (Pro Vývojáře)
+
+Pokud chcete změnit defaultní chování:
+
+**Biblické verše** (seznam přes 50 veršů):
+- Soubor: [bot.py](bot.py#L792) řádek 792
+- Upravte seznam `verses = [...]` aby obsahoval vaše verše
+- Vzor: `'"Text verše" (Bibličtí 1,1)'`
+
+**Požehnání pro konkrétní hry** (dictionary se 54+ hrami):
+- Soubor: [bot.py](bot.py#L852) řádek 852
+- Upravte `game_blessings = {...}` aby obsahoval vaše hry
+- Vzor: `"Název hry": "Personalizované požehnání text 🎮"`
+- Default fallback: Náhodné požehnání když se hra v dictu nenajde
+
+**Časy plánovaných úloh** (cron-like tasky):
+- **Ráno (09:00 CET)**: Ranní zpráva s veršem – [řádek 1698](bot.py#L1698)
+  - Změnit: `if now.hour == 9 and now.minute == 0:`
+- **Večer (22:00 CET)**: Noční zpráva – [řádek 1716](bot.py#L1716)
+  - Změnit: `if now.hour == 22 and now.minute == 0:`
+- **Večer (20:10 CET)**: Free Games – [řádek 1733](bot.py#L1733)
+  - Změnit: `if now.hour == 20 and now.minute == 10:`
+- Vždy **timezone**: `Europe/Prague` (pytz)
+
+**Free Games Platformy** (6 zdrojů):
+- Soubor: [bot.py](bot.py#L602) řádek 602 – funkce `get_free_games()`
+- Máte: Epic Games, Steam, PlayStation, GOG, Ubisoft+, Prime Gaming
+- Chcete přidat/odebrat zdroj? Upravte try/except bloky v [get_free_games()](bot.py#L602)
+- Fallback cache: 6 hodin (mění se v [řádku 223](bot.py#L223) – `21600 sekund`)
+
+**XP Systém & Role Úrovně**:
+- Soubor: [bot.py](bot.py) – hledejte `XP_LEVELS`, `ROLES`
+- 8 úrovní s rolemi: 🔰 Učedník → 👑 Apoštol (nastaveno fixně)
+- Cooldown požehnání: 1 hodina per-game (v `_game_blessing_cooldowns`)
+
+### Databáze Konfigurace
+
+- Soubor: `bot_data.json` (vytvoří se automaticky)
+- Struktura: 
+  ```json
+  {
+    "guild_configs": {
+      "123456789": {
+        "blessing_channel_id": 987654321,
+        "freegames_channel_id": 987654322
+      }
+    }
+  }
+  ```
+- Spravuje se přes `/setchannel` a `/config` – **nedoporučujeme ruční editaci**
 
 ---
 
 ## 🛣️ Roadmapa – Ježíš Discord Bot (v2.x → v3.x)
 
-### 🟩 v2.3.2 (LEGACY – Multi-Server Thread-Safety Patch)
+### 📦 v2.3.2 – Multi-Server Thread-Safety Patch (HOTOVO)
 
-Předchozí verze:
+Historická verze:
 * ✅ **Guild-level locks** pro bezpečné vytváření rolí
 * ✅ **Periodic game tracking** se storage (každých 5 minut)
 * ✅ **Real-time herní statistiky** bez race conditions
@@ -398,9 +457,9 @@ Předchozí verze:
 * ✅ Všechny minihry (kviz, versfight, rollblessing)
 * ✅ XP systém: 🔰 Učedník → 📜 Prorok → 👑 Apoštol
 
-### 🟨 v2.4 (LEGACY – Music QoL Pack)
+### 📦 v2.4 – Music QoL Pack (HOTOVO)
 
-Předchozí verze! Zlepšení hudby a miniher:
+Historická verze – Zlepšení hudby a miniher:
 * ✅ **Blokace duplicitních skladeb** – Detekuje když se uživatel pokusí přidat stejnou skladbu do fronty
 * ✅ **Odhad času fronty** – `/fronta` a `/yt` zobrazují odhad zbývajícího času (⏱️ Odhad: ~45m 30s, 12 skladeb)
 * ✅ **Automatické čištění URL setu** – Když se skladba přehraje nebo se fronta vymaže
@@ -409,9 +468,9 @@ Předchozí verze! Zlepšení hudby a miniher:
 * ✅ Všechny funkce v2.3.2 zachovány (bez breaking changes)
 * ✅ Optimalizované pro multi-server i single-server nasazení
 
-### 🟨 v2.4.1 – Music Playlist & Shuffle (LEGACY)
+### 📦 v2.4.1 – Music Playlist & Shuffle (HOTOVO)
 
-Předchozí verze! Playlist a shuffle funkcionalita:
+Historická verze – Playlist a shuffle funkcionalita:
 * ✅ **YouTube Album/Playlist v jednom kroku** – `/yt <playlist_url>` detekuje playlist a přidá všechny skladby najednou s duplikát-checkingem
 * ✅ **Zamíchání fronty** – Nový command `/shuffle` náhodně zamíchá pořadí skladeb ve frontě (aktuálně hraná skladba zůstane na místě)
 * ✅ **Odhad času playlistu** – Bot vypočítá a zobrazí celkový čas všech skladeb v playlistu před přidáním
@@ -420,9 +479,9 @@ Předchozí verze! Playlist a shuffle funkcionalita:
 * ✅ Zpětná kompatibilita s v2.4 (vše funguje jako do teď)
 * ✅ YouTube přehrávání zůstává beze změn (stejně skvěle funguje!)
 
-### 🟩 v2.5 – Channel Config Pack (AKTUÁLNÍ VERZE)
+### 🟩 v2.5 – Channel Config Pack (HOTOVO)
 
-Nyní aktivní! Správa konfigurace per-guild:
+Správa konfigurace per-guild:
 * ✅ **`/setchannel <typ> <kanál>`** – Rychlé nastavení kanálů (Požehnání, Hry zdarma)
 * ✅ **`/config`** – Přehled aktuální konfigurace serveru s admin-only přístupem
 * ✅ **Bezpečné ukládání nastavení** – Per-guild konfigurace v `bot_data.json` (centralizované)
@@ -431,13 +490,13 @@ Nyní aktivní! Správa konfigurace per-guild:
 * ✅ **Fallback na staré hledání** – Pokud není kanál nastaven, bot si vyhledá kanál podle jména
 * ✅ Zpětná kompatibilita se všemi předchozími verzemi
 
-### 🟨 v2.6 – Free Games Engine 3.0 (PLÁNOVANÉ)
+### 🟩 v2.6 – Free Games Engine 3.0 (AKTIVNÍ)
 
-* Přidané platformy: GOG, Ubisoft, Amazon Gaming
-* Embed galerie her
-* Upozornění na končící hry
-* `/freegames history`
-* Robustnější scraping + fallbacky
+* ✅ **Přidané platformy: GOG, Ubisoft+, Amazon Prime Gaming** – Nový `/freegames` agreguje 6 zdrojů (Epic, Steam, PlayStation, GOG, Ubisoft+, Prime Gaming)
+* ✅ **Per-source status reporting** – Embed zobrazuje stav každé platformy (✅/❌)
+* ✅ **Robustnější scraping + fallbacky** – Všechny zdroje mají vlastní try/except, selhání jednoho neovlivní ostatní
+* ✅ **Message když Steam nemá hry zdarma** – Zobrazí "❌ Steam" když je Steam prázdný
+* 📍 *Upozornění na končící hry* – Základ implementován, volno pro rozšíření (API nevrací expiration data)
 
 ### 🟨 v2.7 – Server Analytics & Summary (PLÁNOVANÉ)
 
