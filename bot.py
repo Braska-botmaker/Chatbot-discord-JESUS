@@ -1,7 +1,7 @@
 # ╔════════════════════════════════════════════════════════════════════════════╗
-# ║      Ježíš Discord Bot v2.4 – Music QoL Pack (Duplicate Block)          ║
-# ║                     Kompletní přepis na slash commands                      ║
-# ║                  s Czech názvy pro maximální unikalitu                      ║
+# ║      Ježíš Discord Bot v2.6.1 – Music QoL Pack (Duplicate Block)           ║
+# ║                     Kompletní přepis na slash commands                     ║
+# ║                  s Czech názvy pro maximální unikalitu                     ║
 # ╚════════════════════════════════════════════════════════════════════════════╝
 
 # ═══════════════════════════════════════════════════════════════════════════════
@@ -748,25 +748,48 @@ def get_free_games():
     except Exception as e:
         print(f"[freegames] Ubisoft+ error: {e}")
 
-    # ═══ AMAZON PRIME GAMING ═══
+    # ═══ AMAZON PRIME GAMING & LUNA ═══
     try:
-        amazon_url = "https://gaming.amazon.com/home"
-        r = requests.get(amazon_url, timeout=6, headers={"User-Agent": "Mozilla/5.0"})
-        html = r.text
+        # Luna.amazon.com – aktuální zdarma hry (přidávají se pravidelně)
+        amazon_urls = [
+            "https://luna.amazon.com/claims/home",
+            "https://gaming.amazon.com/home"
+        ]
         
-        # Hledej free games v datech
-        pattern = re.compile(r'<h3[^>]*>([^<]+)</h3>.*?Prime Gaming', re.DOTALL)
-        count = 0
-        for m in pattern.finditer(html):
-            title = m.group(1).strip()
-            if title and len(title) > 2:
-                url = "https://gaming.amazon.com/home"
-                key = (f"Prime Gaming - {title}", url)
-                if key not in seen and count < 5:
-                    seen.add(key)
-                    games.append({"title": f"Prime Gaming - {title}", "url": url, "source": "Prime Gaming"})
-                    count += 1
-                    source_status["amazon"] = True
+        for amazon_url in amazon_urls:
+            try:
+                r = requests.get(amazon_url, timeout=6, headers={"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64)"})
+                html = r.text
+                
+                # Pattern pro Luna: hledáme nadpisy her v JSON strukturách
+                # Luna používá data-... atributy s názvy her
+                patterns = [
+                    re.compile(r'"title":"([^"]+)".*?"gameTitle":"([^"]+)"', re.DOTALL),
+                    re.compile(r'<h[2-4][^>]*>([^<]{3,50})</h[2-4]>', re.DOTALL),
+                    re.compile(r'data-game-title="([^"]+)"', re.DOTALL),
+                ]
+                
+                count = 0
+                for pattern in patterns:
+                    for m in pattern.finditer(html):
+                        # Vyber poslední skupinu (obvykle je to název hry)
+                        title = m.group(m.lastindex if m.lastindex else 1).strip()
+                        
+                        if title and len(title) > 2 and not any(x in title.lower() for x in ['claim', 'subscribe', 'button', 'play']):
+                            url = amazon_url
+                            key = (f"Prime Gaming - {title}", url)
+                            if key not in seen and count < 5:
+                                seen.add(key)
+                                games.append({"title": f"Prime Gaming - {title}", "url": url, "source": "Prime Gaming"})
+                                count += 1
+                                source_status["amazon"] = True
+                    
+                    if count > 0:
+                        break  # Našli jsme hry, nemusíme pokračovat
+            except Exception as inner_e:
+                print(f"[freegames] Amazon URL {amazon_url} error: {inner_e}")
+                continue
+                
     except Exception as e:
         print(f"[freegames] Amazon Prime Gaming error: {e}")
 
@@ -1529,7 +1552,7 @@ async def verze_command(interaction: discord.Interaction):
     """Show bot version and changelog."""
     try:
         embed = discord.Embed(title="ℹ️ Ježíš Discord Bot", color=discord.Color.gold())
-        embed.add_field(name="Verze", value="v2.6 – Free Games Engine 3.0", inline=False)
+        embed.add_field(name="Verze", value="v2.6.1 – Free Games Engine 3.0", inline=False)
         embed.add_field(name="Aktuální Features", value="""
 🎮 6-Platform Free Games (Epic, Steam, PSN, GOG, Ubisoft+, Prime Gaming)
 ⚙️ `/setchannel` – Konfiguruj kanály per-guild
