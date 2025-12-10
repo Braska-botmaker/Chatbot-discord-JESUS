@@ -1529,13 +1529,14 @@ async def verze_command(interaction: discord.Interaction):
     """Show bot version and changelog."""
     try:
         embed = discord.Embed(title="ℹ️ Ježíš Discord Bot", color=discord.Color.gold())
-        embed.add_field(name="Verze", value="v2.5 – Channel Config Pack", inline=False)
+        embed.add_field(name="Verze", value="v2.6 – Free Games Engine 3.0", inline=False)
         embed.add_field(name="Aktuální Features", value="""
-⚙️ `/setchannel` – Konfiguruj kanály
-📋 `/config` – Zobraz nastavení
+🎮 6-Platform Free Games (Epic, Steam, PSN, GOG, Ubisoft+, Prime Gaming)
+⚙️ `/setchannel` – Konfiguruj kanály per-guild
+📋 `/config` – Zobraz nastavení serveru
 🎵 YouTube Playlist & Shuffle (v2.4.1)
 📊 Odhad času fronty
-🚫 Blokace duplikátů
+🚫 Blokace duplikátů + 1h cooldown na požehnání
 ✅ Per-guild konfigurace""", inline=False)
         embed.add_field(name="GitHub", value="https://github.com/Braska-botmaker/Chatbot-discord-JESUS", inline=False)
         await interaction.response.send_message(embed=embed)
