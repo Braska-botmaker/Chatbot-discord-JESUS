@@ -1,16 +1,17 @@
 # ✝️ Ježíš Discord Bot – hudba, verše a hry zdarma 🙏
 
-**Verze:** v2.6 – Free Games Engine 3.0 | **Platform:** Raspberry Pi Ready
+**Verze:** v2.6.1 – Free Games Engine 3.0 + XP Systém | **Platform:** Raspberry Pi Ready
 
 Discord bot napsaný v Pythonu (discord.py), který umí:
 
 * 🎵 Přehrávat hudbu z URL (YouTube přes `yt-dlp`) do voice kanálu - s názvy skladeb, odhadem času fronty, blokaací duplicitních skladeb, podporou playlistů a shuffle
 * 📖 Posílat ranní a večerní zprávy s biblickým veršem
 * 🙏 Žehnat hráčům při spuštění her a reagovat na společné hraní ve voice
-* 🎁 Každý večer publikovat „Hry zdarma" z 6 platforem (Epic, Steam, PlayStation, GOG, Ubisoft+, Prime Gaming) s embedem a Discord link previews
+* 🎁 Každý večer publikovat „Hry zdarma" z 4+ platforem (Epic, Steam, PlayStation, GOG, IsThereAnyDeal, Reddit) - nyní bez nespolehlivých Ubisoft+ a Prime Gaming
 * ⚙️ Konfigurovat kanály per-guild s `/setchannel` a `/config`
 * 🎮 Minihry s XP systémem (kviz, veršový duel, RNG požehnání)
-* ℹ️ Slash commands: `/komandy`, `/verze`, `/diag` s automatickým autocomplete
+* ✨ **NOVÉ v2.6.1:** XP odměny za hudbu a hlasovou aktivitu s anti-cheat ochranou
+* ℹ️ Slash commands: `/commands`, `/version`, `/diag` s automatickým autocomplete
 
 > Optimalizováno pro běh na Raspberry Pi 24/7, ale funguje i lokálně na Windows/Linux/macOS.
 
@@ -39,20 +40,6 @@ Discord bot napsaný v Pythonu (discord.py), který umí:
 ## ⚡ Rychlý start (5 minut)
 
 Viz **docs/RYCHLY_START.md**
-
-### Slash Commands – jak je používat?
-
-Po přihlášení bota vidíte `/` v Discord chatu. Veškeré příkazy jsou **slash commands**:
-
-```
-/yt https://youtube.com/watch?v=... – Přidej skladbu
-/další – Přeskoč
-/verse – Náhodný verš
-/bless @user – Požehnání pro uživatele
-/komandy – Kompletní seznam
-```
-
-**Žádné prefix commands!** V2.3.2 používá pouze `/` (app_commands) pro modernost a bezpečnost.
 
 ---
 
@@ -181,43 +168,40 @@ Voice práva v cílovém kanálu:
 
 ---
 
-## ⌨️ Příkazy (Slash Commands – v2.5)
+## ⌨️ Příkazy (Slash Commands – v2.6.1)
 
-Hezký přehled najdete v `/komandy`. Základ:
+Hezký přehled najdete v `/commands`. Základ:
 
 ### Hudba
 
-* `/yt <url>` – přidá skladbu nebo playlist do fronty a spustí přehrávání (YouTube přes yt-dlp) – **v2.4: Detekuje duplikáty, zobrazuje odhad času fronty | v2.4.1: Podporuje YouTube playlisty s batch importem a progress feedbackem**
-* `/sp <spotify_url>` – **v2.8: NOVÉ - Přidá skladbu/playlist ze Spotify do fronty (vyhledávání přes YouTube)**
-* `/shuffle` – **v2.4.1: Náhodně zamíchá pořadí skladeb ve frontě (aktuálně hraná zůstane na místě)**
-* `/další` – přeskoči aktuální skladbu
-* `/pauza` / `/pokračuj` – pauza/obnovení
-* `/zastav` – zastaví a vyčistí frontu
-* `/odejdi` – odpojí bota z voice
-* `/fronta` – vypíše frontu **v2.4: S odhadem celkového času (⏱️ Odhad: ~45m 30s)**
+* `/yt <url>` – přidá skladbu nebo playlist do fronty a spustí přehrávání (YouTube přes yt-dlp) - **+1-2 XP**
+* `/skip` – přeskoči aktuální skladbu - **+1-2 XP**
+* `/pause` / `/resume` – pauza/obnovení
+* `/stop` – zastaví a vyčistí frontu
+* `/leave` – odpojí bota z voice
 * `/np` – zobrazí právě přehrávanou skladbu
-* `/vtest` – rychlý 3s tón pro ověření FFmpeg/voice
-* `/diag` – výpis prostředí, práv a instalace
+* `/queue` – vypíše frontu s odhadem celkového času
+* `/shuffle` – náhodně zamíchá pořadí skladeb - **+1-2 XP**
+* `/voicetest` – rychlý 3s tón pro ověření FFmpeg/voice
+
+### Biblické příkazy
+
+* `/verse` – náhodný biblický verš do chatu
+* `/bless [@user]` – krátké osobní požehnání pro uživatele
+* `/biblicquiz` – biblický trivia s 10+ otázkami - **+1-2 XP**
 
 ### Ostatní
 
-* `/verze` – info o verzi a změnách
-* `/verse` – náhodný biblický verš do chatu – denní streak s pochvalou
-* `/freegames` – **v2.6: Aktuální přehled free her z 6 platforem (Epic, Steam, PlayStation, GOG, Ubisoft+, Prime Gaming) s per-source statusem**
-* `/bless @uživatel` – krátké osobní požehnání
-* `/komandy` – kompletní seznam příkazů
+* `/xp` – zobrazí tvou aktuální XP a úroveň
+* `/freegames` – aktuální přehled free her z 4+ spolehlivých zdrojů (Epic, Steam, PlayStation, GOG, IsThereAnyDeal, Reddit)
+* `/commands` – kompletní seznam příkazů
+* `/version` – info o verzi
+* `/diag` – diagnostika bota
 
-### Admin (v2.5)
+### Admin
 
 * `/setchannel <typ> <kanál>` – Nastaví kanál pro "Požehnání" nebo "Hry zdarma" (admin-only)
 * `/config` – Zobrazí aktuální konfiguraci serveru (admin-only)
-
-### Minihry & Hry (v2.4)
-
-* `/biblickykviz` – biblický trivia systém s 10 otázkami **v2.4: Rozšířeno na 32 otázek v databázi pro vyšší variabilitu**
-* `/versfight @user` – veršový duel mezi hráči (hlasování, XP)
-* `/rollblessing` – RNG požehnání s cooldown 1 hodina
-* `/profile [@user]` – kompletní profil s XP, TOP 5 herami, rankingem a rolemi (v2.3.2)
 
 ---
 
@@ -277,16 +261,10 @@ journalctl -u discordbot -f
 
 ### Slash Commands se nezobrazují?
 
-* Bot se nemusel správně **syncer** s Discordem. Zkus:
+* Bot se nemusel správně **syncnout** s Discordem. Zkus:
   1. Restartuj bot: `systemctl restart discordbot` (RPi) nebo Ctrl+C a znovu spusť
-  2. Zkontroluj logy – měl by vidět: `[commands] Synced 15 slash commands`
-  3. Pokud pořád ne, zkontroluj oprávnění bota (Bot → Scopes: `bot`, Permissions: minimálně `Send Messages`, `Connect`, `Speak`)
-
-### Slash Command selhal – "Interaction Failed"
-
-* Příčina: Bot nemá čas odpovědět do 3 sekund (timeout Discord API)
-* V2.3.2 to řeší: všechny commands mají `await interaction.response.defer()` nebo `send_message()`
-* Pokud pořád selhává: zkontroluj logy bota (`journalctl -u discordbot -f`)
+  2. Zkontroluj logy – měl by vidět: `[commands] Synced 23 slash commands`
+  3. Pokud pořád ne, zkontroluj oprávnění bota
 
 ### 🔧 Diagnostické nástroje
 
@@ -300,19 +278,15 @@ python3 tools/rpi_voice_diagnostics.py
 /diag
 ```
 
----
-
 ### 1) „FFmpeg test selhal: ClientException: Not connected to voice"
 
-* Zkontrolujte, že jste v **tom samém voice kanálu** jako bot při `/vtest`.
+* Zkontrolujte, že jste v **tom samém voice kanálu** jako bot při `/voicetest`.
 * Ověřte práva kanálu: **Connect** a **Speak**.
 * Na *Stage* kanálu udělte botovi *Invite to Speak*.
-* Zkuste jiný voice kanál (někdy pomůže změna regionu/latence).
 
 ### 2) Nejde přehrávání / YouTube 403
 
 * Musí být nainstalováno **FFmpeg** a **yt-dlp**.
-* Pokud YouTube blokuje bez hlaviček, kód už posílá správné HTTP headers do FFmpeg.
 * Vyzkoušejte jinou URL nebo aktualizujte `yt-dlp`:
 
   ```bash
@@ -333,47 +307,9 @@ python3 tools/rpi_voice_diagnostics.py
 * Na Developer Portalu zapněte **Presence Intent** a **Server Members Intent**.
 * Pozvěte bota s právy **Send Messages**, **Connect**, **Speak**.
 
-### 5) Epic Games API vrací prázdno
-
-* Někdy nejsou zrovna hry zdarma nebo API vrátí prázdný seznam → bot to ošetřuje.
-
 ---
 
-## 🎧 Poznámky k Slash Commands (v2.3.2)
-
-### Jak používat?
-
-1. **Napište `/` do Discord zprávy** – Discord ti nabídne autocomplete
-2. **Vyber příkaz** – např. `/yt`, `/verse`, `/bless`
-3. **Vyplň parametry** – Discord ti pomůže s autosuggestem
-4. **Stiskni Enter** – příkaz se vykoná
-
-### Příklady
-
-```
-/yt https://youtube.com/watch?v=dQw4w9WgXcQ
-/další
-/verse
-/bless @username
-/komandy
-/diag
-```
-
-### Slash Commands vs Prefix Commands (Proč upgrade?)
-
-| Vlastnost | Slash Commands (`/`) | Prefix Commands (`!`) |
-|-----------|----------------------|----------------------|
-| Autocomplete | ✅ Ano | ❌ Ne |
-| Viditelnost | ✅ Hned vidět | ❌ Skryta |
-| Bezpečnost | ✅ Bezpečnější | ❌ Riziková |
-| Modernost | ✅ Budoucí Discord | ❌ Zastaralé |
-| Error Handling | ✅ 39 try/except | ⚠️ Méně |
-
-**Doporučujeme: Upgrade na v2.4!**
-
----
-
-## 🛠️ Přizpůsobení (v2.6)
+## 🛠️ Přizpůsobení (v2.6.1)
 
 ### Per-Guild Konfigurace (Doporučeno)
 
@@ -538,23 +474,17 @@ Správa konfigurace per-guild:
 
 **JEŽÍŠ DISCORD BOT – CUSTOM NON-COMMERCIAL LICENSE**
 
-Tento projekt je chráněn vlastní non-commercial licencí. 
-
 ✅ **Povoleno:**
 - Kopírování a úpravy kódu
 - Osobní a nekomercí používání
 - Distribuce v nekomercích účelech (bez poplatku)
 
 ❌ **Zakázáno:**
-- Komerční využití (prodej, placené služby, monetizace bez svolení)
-- Vydávání kódu za své bez zmínění autora
+- Komerční využití bez svolení
 
 ⚠️ **Povinné:**
 - Zmínit autora: **Matěj Horák (Braska-botmaker)**
 - Zachovat licenci v distribuovaných verzích
-- Odkaz na originální repozitář: https://github.com/Braska-botmaker/Chatbot-discord-JESUS
-
-**Komerční licence:** Chcete-li kód používat komerčně, napište autorovi na GitHub pro vyjednání individuálních podmínek.
 
 Plný text licence: **LICENSE** soubor v kořeni repozitáře
 
@@ -564,5 +494,10 @@ Plný text licence: **LICENSE** soubor v kořeni repozitáře
 
 * `discord.py` tým a komunita
 * Autoři `yt-dlp` a `ffmpeg`
+* Zdroje free her: Epic Games, Steam, PlayStation, GOG, IsThereAnyDeal, Reddit r/FreeGames
+
+---
+
+**Šťastné hraní a čtení! 🎵📖🎮**
 
 

@@ -611,8 +611,8 @@ def get_free_games():
         "steam": False,
         "playstation": False,
         "gog": False,
-        "ubisoft": False,
-        "amazon": False
+        "cheapshark": False,
+        "ubisoft": False
     }
 
     # ═══ EPIC GAMES ═══
@@ -724,74 +724,88 @@ def get_free_games():
     except Exception as e:
         print(f"[freegames] GOG error: {e}")
 
-    # ═══ UBISOFT+ ═══
+    # ═══ ISTHEREANYDEAL API (Prime Gaming + free hry) ═══
     try:
-        # Ubisoft+ Free Games - scrapování z Ubisoft stránky
-        ubisoft_url = "https://www.ubisoft.com/en-US/ubisoft-plus"
-        r = requests.get(ubisoft_url, timeout=6, headers={"User-Agent": "Mozilla/5.0"})
-        html = r.text
+        # IsThereAnyDeal má filtr speciálně na FREE hry
+        # Nejspolehlivější zdroj pro detekci skutečně zdarma her
+        iad_url = "https://api.isthereanydeal.com/v01/deals/list?key=FREE&limit=40&expand=game"
+        r = requests.get(iad_url, timeout=6)
+        data = r.json()
         
-        # Hledej free games v datech
-        pattern = re.compile(r'"game_name":"([^"]+)".*?"image_url":"([^"]+)"', re.DOTALL)
-        count = 0
-        for m in pattern.finditer(html):
-            title = m.group(1).strip()
-            # Ubisoft+ všechny hry "free"
-            if title:
-                url = "https://www.ubisoft.com/en-US/ubisoft-plus"
-                key = (f"Ubisoft+ - {title}", url)
-                if key not in seen and count < 5:
-                    seen.add(key)
-                    games.append({"title": f"Ubisoft+ - {title}", "url": url, "source": "Ubisoft+"})
-                    count += 1
-                    source_status["ubisoft"] = True
-    except Exception as e:
-        print(f"[freegames] Ubisoft+ error: {e}")
-
-    # ═══ AMAZON PRIME GAMING & LUNA ═══
-    try:
-        # Luna.amazon.com – aktuální zdarma hry (přidávají se pravidelně)
-        amazon_urls = [
-            "https://luna.amazon.com/claims/home",
-            "https://gaming.amazon.com/home"
-        ]
-        
-        for amazon_url in amazon_urls:
-            try:
-                r = requests.get(amazon_url, timeout=6, headers={"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64)"})
-                html = r.text
-                
-                # Pattern pro Luna: hledáme nadpisy her v JSON strukturách
-                # Luna používá data-... atributy s názvy her
-                patterns = [
-                    re.compile(r'"title":"([^"]+)".*?"gameTitle":"([^"]+)"', re.DOTALL),
-                    re.compile(r'<h[2-4][^>]*>([^<]{3,50})</h[2-4]>', re.DOTALL),
-                    re.compile(r'data-game-title="([^"]+)"', re.DOTALL),
-                ]
-                
+        if isinstance(data, dict) and "list" in data:
+            deals_list = data.get("list", [])
+            if isinstance(deals_list, list):
                 count = 0
-                for pattern in patterns:
-                    for m in pattern.finditer(html):
-                        # Vyber poslední skupinu (obvykle je to název hry)
-                        title = m.group(m.lastindex if m.lastindex else 1).strip()
+                for deal in deals_list:
+                    if not isinstance(deal, dict):
+                        continue
+                    try:
+                        game = deal.get("game", {})
+                        title = game.get("title", "Unknown").strip()
+                        url = game.get("url", "")
                         
-                        if title and len(title) > 2 and not any(x in title.lower() for x in ['claim', 'subscribe', 'button', 'play']):
-                            url = amazon_url
-                            key = (f"Prime Gaming - {title}", url)
-                            if key not in seen and count < 5:
+                        if title and url and count < 10:
+                            # IsThereAnyDeal vrací ve formátu /game/...
+                            full_url = f"https://isthereanydeal.com{url}" if url.startswith("/") else url
+                            key = (title, full_url)
+                            if key not in seen:
                                 seen.add(key)
-                                games.append({"title": f"Prime Gaming - {title}", "url": url, "source": "Prime Gaming"})
+                                games.append({
+                                    "title": title,
+                                    "url": full_url,
+                                    "source": "IsThereAnyDeal"
+                                })
                                 count += 1
-                                source_status["amazon"] = True
-                    
-                    if count > 0:
-                        break  # Našli jsme hry, nemusíme pokračovat
-            except Exception as inner_e:
-                print(f"[freegames] Amazon URL {amazon_url} error: {inner_e}")
-                continue
-                
+                                source_status["cheapshark"] = True  # Používáme pro agregaci
+                    except (KeyError, TypeError):
+                        continue
     except Exception as e:
-        print(f"[freegames] Amazon Prime Gaming error: {e}")
+        print(f"[freegames] IsThereAnyDeal error: {e}")
+
+    # ═══ REDDIT /r/FreeGames (Prime Gaming + Ubisoft+) ═══
+    try:
+        # Reddit /r/FreeGames je nejlepší zdroj pro aktuální free games
+        # Komunita tam oznamuje všechny free hry včetně Prime Gaming a Ubisoft+
+        reddit_feed = "https://www.reddit.com/r/FreeGames/.rss"
+        r = requests.get(reddit_feed, timeout=6, headers={"User-Agent": "Mozilla/5.0"})
+        
+        if r.status_code == 200:
+            try:
+                root = ET.fromstring(r.content)
+                items = root.findall('.//item')
+                count = 0
+                
+                for item in items[:8]:  # Posledních 8 postů
+                    title_el = item.find('title')
+                    link_el = item.find('link')
+                    
+                    if title_el is None or link_el is None:
+                        continue
+                    
+                    title = title_el.text.strip() if title_el.text else "Free Game"
+                    link = link_el.text.strip() if link_el.text else ""
+                    
+                    if title and link and count < 8:
+                        # Filtruj nerelevantní posty a FREE-TO-PLAY hry
+                        # [F2P] = Free-to-Play (permanent) - nechceme
+                        # [FREE] = Limited-time free - chceme!
+                        if any(x in title.lower() for x in ['megathread', 'weekly', 'discussion', 'giveaway', '[f2p]']):
+                            continue
+                        
+                        key = (f"Reddit - {title}", link)
+                        if key not in seen:
+                            seen.add(key)
+                            games.append({
+                                "title": f"{title}",
+                                "url": link,
+                                "source": "FreeGames Reddit"
+                            })
+                            count += 1
+                            source_status["ubisoft"] = True  # Signalizace že máme alternativní zdroj
+            except Exception as e:
+                print(f"[freegames] Reddit parse error: {e}")
+    except Exception as e:
+        print(f"[freegames] Reddit error: {e}")
 
     return games, source_status
 
@@ -865,7 +879,18 @@ verses = [
     '"Ten, kdo je v Kristu, je nové stvoření." (2 Korintským 5,17)',
     '"Běžte sebou v určené běh s vytrvalostí." (Židům 12,1)',
     '"Nezapomínejte na pohostinnost!" (Židům 13,2)',
-    '"Bůh není Bůh těch mrtvých, ale živých." (Marek 12,27)'
+    '"Bůh není Bůh těch mrtvých, ale živých." (Marek 12,27)',
+    '"Jako otec se slitovává nad dětmi, tak se Pán slitovává nad těmi, kdo ho bojí." (Žalm 103,13)',
+    '"Boží slovo je světlo mé noze a lampa mé stezce." (Žalm 119,105)',
+    '"Voláš-li si mě, půjdu s tebou." (Izajáš 43,2)',
+    '"Mám vám sdělit svůj pokoj, abyste byli v klidu." (Jan 14,27)',
+    '"Nosim vás v životě, a budu vás nést až do stáří." (Izajáš 46,4)',
+    '"Jeden den u Hospodina je lepší než tisíc jinde." (Žalm 84,11)',
+    '"Dav modlitby se ozývá v jeho sluch." (Žalm 34,16)',
+    '"Všechno vám bude odpuštěno, když věříte." (Marek 11,24)',
+    '"Bůh ti dává sílu na každý den, který přijde." (Exodus 16,4)',
+    '"Já jsem воскресení a život." (Jan 11,25)',
+    '"Tvá věrnost tě neopustí." (Přísloví 20,22)'
 ]
 
 # ═══════════════════════════════════════════════════════════════════════════════
@@ -955,6 +980,32 @@ async def on_ready():
     
     # Načti game activity z storage
     await load_game_activity_from_storage()
+    
+    # Validuj game activity data - pokud jsou poškozená, resetuj
+    game_reset_needed = False
+    for user_id, game_data in list(game_activity.items()):
+        if not isinstance(game_data.get("games", {}), dict):
+            print(f"[game-fix] Poškozená game data pro user {user_id}. Resetuji...")
+            game_reset_needed = True
+            break
+        # Také zkontroluj, aby všechny hodiny byly čísla
+        for game_name, hours in game_data.get("games", {}).items():
+            try:
+                if float(hours) < 0:
+                    print(f"[game-fix] Negativní čas pro {game_name} (user {user_id}). Resetuji...")
+                    game_reset_needed = True
+                    break
+            except (ValueError, TypeError):
+                print(f"[game-fix] Chybný typ pro hodiny (user {user_id}). Resetuji...")
+                game_reset_needed = True
+                break
+        if game_reset_needed:
+            break
+    
+    if game_reset_needed:
+        game_activity.clear()
+        await save_game_activity_to_storage()
+        print("[game-fix] ✅ game_activity resetován (poškozená data)")
     
     # Načti user XP z storage
     await load_user_xp_from_storage()
@@ -1070,6 +1121,10 @@ async def yt_command(interaction: discord.Interaction, url: str):
             summary += f"⏱️ Celkový čas fronty: ~{mins}m {secs}s ({total} skladeb)"
             
             await interaction.followup.send(summary)
+            
+            # ✨ Přidej XP za hudební aktivitu
+            if added_count > 0:
+                await add_xp_to_user(interaction.user.id, reason="music_command")
         
         except Exception as e:
             print(f"[yt] Playlist error: {e}")
@@ -1103,9 +1158,12 @@ async def yt_command(interaction: discord.Interaction, url: str):
             mins, secs, count = _estimate_queue_duration(guild.id)
             duration_str = f" (~{mins}m {secs}s, {count} skladeb v frontě)" if count > 0 else ""
             await interaction.followup.send(f"✅ Přidáno do fronty: **{title}**\n{url}{duration_str}")
+            
+            # ✨ Přidej XP za hudební aktivitu
+            await add_xp_to_user(interaction.user.id, reason="music_command")
 
-@bot.tree.command(name="další", description="Přeskoč na další písničku")
-async def dalsi_command(interaction: discord.Interaction):
+@bot.tree.command(name="skip", description="Přeskoč na další skladbu")
+async def skip_command(interaction: discord.Interaction):
     """Skip current song."""
     try:
         guild = interaction.guild
@@ -1115,11 +1173,14 @@ async def dalsi_command(interaction: discord.Interaction):
             return
         vc.stop()
         await interaction.response.send_message("⏭️ Přeskočeno!")
+        
+        # ✨ Přidej XP za hudební aktivitu
+        await add_xp_to_user(interaction.user.id, reason="music_command")
     except Exception as e:
         await interaction.response.send_message(f"❌ Chyba: {str(e)[:100]}")
 
-@bot.tree.command(name="pauza", description="Pozastavit přehrávání")
-async def pauza_command(interaction: discord.Interaction):
+@bot.tree.command(name="pause", description="Pozastav přehrávání")
+async def pause_command(interaction: discord.Interaction):
     """Pause playback."""
     try:
         guild = interaction.guild
@@ -1129,11 +1190,14 @@ async def pauza_command(interaction: discord.Interaction):
             return
         vc.pause()
         await interaction.response.send_message("⏸️ Pozastaveno!")
+        
+        # ✨ Přidej XP za hudební aktivitu
+        await add_xp_to_user(interaction.user.id, reason="music_command")
     except Exception as e:
         await interaction.response.send_message(f"❌ Chyba: {str(e)[:100]}")
 
-@bot.tree.command(name="pokračuj", description="Pokračovat v přehrávání")
-async def pokracuj_command(interaction: discord.Interaction):
+@bot.tree.command(name="resume", description="Obnoví přehrávání")
+async def resume_command(interaction: discord.Interaction):
     """Resume playback."""
     try:
         guild = interaction.guild
@@ -1144,13 +1208,16 @@ async def pokracuj_command(interaction: discord.Interaction):
         if vc.is_paused():
             vc.resume()
             await interaction.response.send_message("▶️ Pokračuju!")
+            
+            # ✨ Přidej XP za hudební aktivitu
+            await add_xp_to_user(interaction.user.id, reason="music_command")
         else:
             await interaction.response.send_message("❌ Nic není pozastaveno!")
     except Exception as e:
         await interaction.response.send_message(f"❌ Chyba: {str(e)[:100]}")
 
-@bot.tree.command(name="zastav", description="Zastavit přehrávání")
-async def zastav_command(interaction: discord.Interaction):
+@bot.tree.command(name="stop", description="Zastaví přehrávání a vyčistí frontu")
+async def stop_command(interaction: discord.Interaction):
     """Stop playback and clear queue."""
     try:
         guild = interaction.guild
@@ -1164,11 +1231,14 @@ async def zastav_command(interaction: discord.Interaction):
         _clear_queue_urls(guild.id)  # v2.4: čistit URL set
         now_playing[guild.id] = None
         await interaction.response.send_message("⏹️ Zastaveno! Fronta smazána.")
+        
+        # ✨ Přidej XP za hudební aktivitu
+        await add_xp_to_user(interaction.user.id, reason="music_command")
     except Exception as e:
         await interaction.response.send_message(f"❌ Chyba: {str(e)[:100]}")
 
-@bot.tree.command(name="odejdi", description="Odpoj se z voice kanálu")
-async def odejdi_command(interaction: discord.Interaction):
+@bot.tree.command(name="leave", description="Opustí voice kanál")
+async def leave_command(interaction: discord.Interaction):
     """Leave voice channel."""
     try:
         guild = interaction.guild
@@ -1182,12 +1252,15 @@ async def odejdi_command(interaction: discord.Interaction):
         now_playing[guild.id] = None
         await vc.disconnect()
         await interaction.response.send_message("👋 Odešel jsem z voice kanálu.")
+        
+        # ✨ Přidej XP za hudební aktivitu
+        await add_xp_to_user(interaction.user.id, reason="music_command")
     except Exception as e:
         await interaction.response.send_message(f"❌ Chyba: {str(e)[:100]}")
 
-@bot.tree.command(name="np", description="Zobraz právě přehrávanou skladbu")
+@bot.tree.command(name="np", description="Zobraz právě hranou skladbu")
 async def np_command(interaction: discord.Interaction):
-    """Show now playing."""
+    """Show now playing with music controls (icons only)."""
     try:
         guild = interaction.guild
         vc = discord.utils.get(bot.voice_clients, guild=guild)
@@ -1196,12 +1269,59 @@ async def np_command(interaction: discord.Interaction):
             return
         title = now_playing.get(guild.id, "Unknown")
         embed = discord.Embed(title="🎵 Právě hraje", description=title, color=discord.Color.blue())
-        await interaction.response.send_message(embed=embed)
+        
+        # Music control buttons (icons only)
+        class MusicControlView(discord.ui.View):
+            def __init__(self, guild_id):
+                super().__init__(timeout=300)
+                self.guild_id = guild_id
+            
+            @discord.ui.button(label="⏭️", style=discord.ButtonStyle.blurple)
+            async def next_button(self, button_interaction: discord.Interaction, button: discord.ui.Button):
+                guild = button_interaction.guild
+                vc = discord.utils.get(bot.voice_clients, guild=guild)
+                if vc and vc.is_playing():
+                    vc.stop()  # Spustí after_play callback který zavolá play_next()
+                    await button_interaction.response.defer()
+                else:
+                    await button_interaction.response.send_message("❌ Nic se nehraje!", ephemeral=True)
+            
+            @discord.ui.button(label="⏸️", style=discord.ButtonStyle.blurple)
+            async def pause_button(self, button_interaction: discord.Interaction, button: discord.ui.Button):
+                guild = button_interaction.guild
+                vc = discord.utils.get(bot.voice_clients, guild=guild)
+                if vc and vc.is_playing():
+                    vc.pause()
+                    await button_interaction.response.defer()
+                elif vc and vc.is_paused():
+                    vc.resume()
+                    await button_interaction.response.defer()
+                else:
+                    await button_interaction.response.send_message("❌ Nic se nehraje!", ephemeral=True)
+            
+            @discord.ui.button(label="🔀", style=discord.ButtonStyle.blurple)
+            async def shuffle_button(self, button_interaction: discord.Interaction, button: discord.ui.Button):
+                guild = button_interaction.guild
+                if guild.id in music_queues and len(music_queues[guild.id]) > 1:
+                    # Zachovat aktuálně hrající a zamíchat zbytek
+                    queue = list(music_queues[guild.id])
+                    if len(queue) > 1:
+                        current = queue[0]
+                        rest = queue[1:]
+                        random.shuffle(rest)
+                        music_queues[guild.id] = deque([current] + rest)
+                    await button_interaction.response.defer()
+                else:
+                    await button_interaction.response.send_message("❌ Ve frontě méně než 2 skladby!", ephemeral=True)
+        
+        await interaction.response.send_message(embed=embed, view=MusicControlView(guild.id))
+    except Exception as e:
+        await interaction.response.send_message(f"❌ Chyba: {str(e)[:100]}")
     except Exception as e:
         await interaction.response.send_message(f"❌ Chyba: {str(e)[:100]}")
 
-@bot.tree.command(name="fronta", description="Zobraz hudební frontu")
-async def fronta_command(interaction: discord.Interaction):
+@bot.tree.command(name="queue", description="Zobraz frontu skladeb")
+async def queue_command(interaction: discord.Interaction):
     """Show music queue."""
     try:
         guild = interaction.guild
@@ -1228,8 +1348,9 @@ async def fronta_command(interaction: discord.Interaction):
     except Exception as e:
         await interaction.response.send_message(f"❌ Chyba: {str(e)[:100]}")
 
-@bot.tree.command(name="vtest", description="Test voice připojení")
-async def vtest_command(interaction: discord.Interaction):
+
+@bot.tree.command(name="voicetest", description="Test hlasového připojení")
+async def voicetest_command(interaction: discord.Interaction):
     """Test voice connection."""
     await interaction.response.defer()
     guild = interaction.guild
@@ -1350,8 +1471,14 @@ async def load_game_activity_from_storage():
                 else:
                     last_update = datetime.datetime.now()
                 
+                # Ověř, že games je dict
+                games_data = data.get("games", {})
+                if not isinstance(games_data, dict):
+                    print(f"[game_activity] CHYBA: user {user_id} má poškozená data, resetuji")
+                    games_data = {}
+                
                 game_activity[user_id] = {
-                    "games": data.get("games", {}),
+                    "games": games_data,
                     "last_update": last_update
                 }
             print(f"[game_activity] Loaded game data for {len(game_activity)} users")
@@ -1359,7 +1486,7 @@ async def load_game_activity_from_storage():
         print(f"[game_activity] Failed to load: {e}")
 
 async def save_game_activity_to_storage():
-    """Ulož game activity do persistent storage (bot_data.json)."""
+    """Ulož game activity do persistent storage (bot_data.json) - VŽDY KONTROLUJ DATA."""
     try:
         db = _load_data()
         activity_data = {}
@@ -1367,8 +1494,29 @@ async def save_game_activity_to_storage():
             last_update_str = None
             if data.get("last_update"):
                 last_update_str = data["last_update"].isoformat()
+            
+            # Validuj games dict
+            games_dict = data.get("games", {})
+            if not isinstance(games_dict, dict):
+                print(f"[game_activity] CHYBA: user {user_id} má poškozená games data! Resetuji...")
+                games_dict = {}
+            
+            # Validuj všechny hodnoty jsou čísla
+            clean_games = {}
+            for game_name, hours in games_dict.items():
+                try:
+                    hours_float = float(hours)
+                    if hours_float < 0:
+                        print(f"[game_activity] Negativní čas {game_name} pro user {user_id}. Resetuji na 0...")
+                        clean_games[game_name] = 0
+                    else:
+                        clean_games[game_name] = hours_float
+                except (ValueError, TypeError):
+                    print(f"[game_activity] Chybný typ hodin pro {game_name} (user {user_id}). Ignoruji...")
+                    continue
+            
             activity_data[str(user_id)] = {
-                "games": data.get("games", {}),
+                "games": clean_games,
                 "last_update": last_update_str
             }
         db["game_activity"] = activity_data
@@ -1447,7 +1595,7 @@ async def verse_command(interaction: discord.Interaction):
     except Exception as e:
         await interaction.response.send_message(f"❌ Chyba: {str(e)[:100]}")
 
-@bot.tree.command(name="freegames", description="Hry zdarma – Epic Games, Steam, PlayStation, GOG, Ubisoft+, Amazon Prime")
+@bot.tree.command(name="freegames", description="Free games – Epic Games, Steam, PlayStation, GOG, IsThereAnyDeal, Reddit")
 async def freegames_command(interaction: discord.Interaction):
     """Show free games from multiple platforms with per-source status."""
     await interaction.response.defer()
@@ -1547,72 +1695,78 @@ async def bless_command(interaction: discord.Interaction, user: discord.User = N
     except Exception as e:
         await interaction.response.send_message(f"❌ Chyba: {str(e)[:100]}")
 
-@bot.tree.command(name="verze", description="Info o verzi botu")
-async def verze_command(interaction: discord.Interaction):
+@bot.tree.command(name="version", description="Verze bota a info")
+async def version_command(interaction: discord.Interaction):
     """Show bot version and changelog."""
     try:
-        embed = discord.Embed(title="ℹ️ Ježíš Discord Bot", color=discord.Color.gold())
-        embed.add_field(name="Verze", value="v2.6.1 – Free Games Engine 3.0", inline=False)
-        embed.add_field(name="Aktuální Features", value="""
-🎮 6-Platform Free Games (Epic, Steam, PSN, GOG, Ubisoft+, Prime Gaming)
-⚙️ `/setchannel` – Konfiguruj kanály per-guild
-📋 `/config` – Zobraz nastavení serveru
+        embed = discord.Embed(title="ℹ️ Jesus Discord Bot", color=discord.Color.gold())
+        embed.add_field(name="Version", value="v2.6.1 – Free Games Engine 3.0", inline=False)
+        embed.add_field(name="Current Features", value="""
+🎮 Multi-Platform Free Games (Epic, Steam, PSN, GOG, IsThereAnyDeal, Reddit)
+⚙️ `/setchannel` – Configure channels per-guild
+📋 `/config` – Show server settings
 🎵 YouTube Playlist & Shuffle (v2.4.1)
-📊 Odhad času fronty
-🚫 Blokace duplikátů + 1h cooldown na požehnání
-✅ Per-guild konfigurace""", inline=False)
+📊 Queue duration estimate
+🚫 Duplicate blocking + 1h blessing cooldown
+✅ Per-guild configuration
+✨ XP & Voice activity rewards (v2.6+)""", inline=False)
         embed.add_field(name="GitHub", value="https://github.com/Braska-botmaker/Chatbot-discord-JESUS", inline=False)
         await interaction.response.send_message(embed=embed)
     except Exception as e:
-        await interaction.response.send_message(f"❌ Chyba: {str(e)[:100]}")
+        await interaction.response.send_message(f"❌ Error: {str(e)[:100]}")
 
-@bot.tree.command(name="komandy", description="Všechny dostupné příkazy")
-async def komandy_command(interaction: discord.Interaction):
+@bot.tree.command(name="commands", description="Zobraz všechny dostupné příkazy")
+async def commands_command(interaction: discord.Interaction):
     """Show all available commands."""
     try:
-        embed = discord.Embed(title="📋 Příkazy – Ježíš Discord Bot v2.5", color=discord.Color.blue())
-        embed.add_field(name="🎵 Hudba", value="""
-/yt <url> – Přehrávej z YouTube (playlist support)
-/shuffle – Zamíchá frontu
-/další – Přeskočí zrovna hranou skladbu
-/pauza – Pozastaví hraní skladby
-/pokračuj – Pokračuj
-/zastav – Zastavá & vyčistí frontu
-/odejdi – Odejde z voice kanálu
-/np – Ukáže právě hranou skladbu
-/fronta – Zobrazí hudební frontu
-/vtest – Otestuje voice připojení
+        embed = discord.Embed(title="📋 Commands – Jesus Discord Bot v2.6.1", color=discord.Color.blue())
+        embed.add_field(name="🎵 Music (+XP)", value="""
+/yt <url> – Přidej skladbu/playlist (YouTube, +1-2 XP)
+/skip – Přeskoči skladbu (+1-2 XP)
+/pause – Pozastavit
+/resume – Obnovit
+/stop – Zastavit & vyčistit
+/leave – Odejít z voice
+/np – Právě se hraje
+/queue – Fronta skladeb
+/shuffle – Zamíchat frontu (+1-2 XP)
+/voicetest – Ověřit voice
 """, inline=False)
-        embed.add_field(name="📖 Ostatní", value="""
-/verze – Info o verzi
-/verse – Náhodný verš
-/freegames – Hry zdarma
+        embed.add_field(name="📖 Bible & Other", value="""
+/verse – Náhodný biblický verš
 /bless [@user] – Požehnání
+/biblicquiz – Bible trivia (+1-2 XP)
+/freegames – Free games (Epic, Steam, GOG, IsThereAnyDeal, Reddit)
+/version – Info o verzi
 /diag – Diagnostika
-/komandy – Tohle
+/commands – Tato nápověda
 """, inline=False)
-        embed.add_field(name="⚙️ Admin (v2.5)", value="""
-/setchannel <typ> <kanál> – Nastav kanál
+        embed.add_field(name="⚙️ Admin & XP (v2.5+)", value="""
+/setchannel <type> <channel> – Nastav kanál
 /config – Zobraz konfiguraci
+/profile [@user] – Tvůj profil s XP
 """, inline=False)
-        embed.add_field(name="🎮 Minihry & Hry (v2.4)", value="""
-/biblickykviz – Biblické otázky za XP
+        embed.add_field(name="🎮 Minigames (v2.4+)", value="""
 /versfight @user – Veršový duel
-/rollblessing – RNG požehnání
-/profile [@user] – Profil s XP, TOP 5 herami, rankingem, rolemi (v2.4)
+""", inline=False)
+        embed.add_field(name="✨ NEW v2.6.1", value="""
+🎵 XP za hudbu: /yt, /skip, /pause, /resume, /shuffle (1-2 XP, 20s cooldown)
+🎤 XP za hlas: Automatické v voice když bot hraje (2-5 XP, 60s cooldown)
+🎁 Free Games: Opraveny nespolehlivé API (Ubisoft+, Prime Gaming odstraněno)
+✅ IsThereAnyDeal + Reddit r/FreeGames přidáno
 """, inline=False)
         await interaction.response.send_message(embed=embed)
     except Exception as e:
         await interaction.response.send_message(f"❌ Chyba: {str(e)[:100]}")
 
-@bot.tree.command(name="diag", description="Diagnostika a info o botu")
+@bot.tree.command(name="diag", description="Diagnostika bota")
 async def diag_command(interaction: discord.Interaction):
     """Show bot diagnostics."""
     await interaction.response.defer()
     embed = discord.Embed(title="🩺 Diagnostika", color=discord.Color.green())
     machine = platform.machine()
     is_rpi = _is_arm_system()
-    embed.add_field(name="💻 Systém", value=f"Machine: {machine}\nARM: {'✅' if is_rpi else '❌'}", inline=True)
+    embed.add_field(name="💻 System", value=f"Machine: {machine}\nARM: {'✅' if is_rpi else '❌'}", inline=True)
     ffmpeg_ok = "✅" if has_ffmpeg() else "❌"
     opus_ok = "✅" if HAS_OPUS else "❌"
     nacl_ok = "✅" if HAS_NACL else "❌"
@@ -1620,46 +1774,46 @@ async def diag_command(interaction: discord.Interaction):
     voice_count = len(bot.voice_clients)
     embed.add_field(name="🎤 Voice", value=f"Connected: {voice_count}", inline=True)
     if bot.user:
-        embed.add_field(name="⏱️ Verze", value="v2.5\nChannel Config Pack", inline=True)
+        embed.add_field(name="⏱️ Version", value="v2.6\nFree Games Engine 3.0", inline=True)
     await interaction.followup.send(embed=embed)
 
-@bot.tree.command(name="setchannel", description="Nastav kanál pro požehnání nebo hry zdarma (v2.5)")
-@app_commands.choices(typ=[
-    app_commands.Choice(name="Požehnání 🙏", value="blessing"),
-    app_commands.Choice(name="Hry zdarma 💵", value="freegames"),
+@bot.tree.command(name="setchannel", description="Nastav kanál pro požehnání nebo hry zdarma")
+@app_commands.choices(type=[
+    app_commands.Choice(name="Blessings 🙏", value="blessing"),
+    app_commands.Choice(name="Free games 💵", value="freegames"),
 ])
-async def setchannel_command(interaction: discord.Interaction, typ: str, kanál: discord.TextChannel):
+async def setchannel_command(interaction: discord.Interaction, type: str, channel: discord.TextChannel):
     """Nastav channel pro specifický účel (v2.5 – Channel Config Pack)."""
     try:
         # Kontroluj, že je uživatel admin
         if not interaction.user.guild_permissions.administrator:
-            await interaction.response.send_message("❌ Musíš být администратор!")
+            await interaction.response.send_message("❌ You must be an administrator!")
             return
         
         # Ulož konfiguraci do bot_data.json
         db = _load_data()
-        await _save_guild_config_to_db(db, interaction.guild.id, typ, kanál.id)
+        await _save_guild_config_to_db(db, interaction.guild.id, type, channel.id)
         
         # Potvrzení
-        typ_jmeno = {"blessing": "Požehnání", "freegames": "Hry zdarma"}.get(typ, typ)
+        type_name = {"blessing": "Blessings", "freegames": "Free Games"}.get(type, type)
         embed = discord.Embed(
-            title="✅ Kanál nastaven!",
-            description=f"**{typ_jmeno}** → {kanál.mention}",
+            title="✅ Channel set!",
+            description=f"**{type_name}** → {channel.mention}",
             color=discord.Color.green()
         )
         await interaction.response.send_message(embed=embed)
-        print(f"[config] Guild {interaction.guild.id}: {typ} → {kanál.id} (uloženo)")
+        print(f"[config] Guild {interaction.guild.id}: {type} → {channel.id} (saved)")
         
     except Exception as e:
-        await interaction.response.send_message(f"❌ Chyba: {str(e)[:100]}")
+        await interaction.response.send_message(f"❌ Error: {str(e)[:100]}")
 
-@bot.tree.command(name="config", description="Zobraz konfiguraci serveru (v2.5)")
+@bot.tree.command(name="config", description="Zobraz konfiguraci serveru")
 async def config_command(interaction: discord.Interaction):
-    """Zobraz aktuální konfiguraci serveru (v2.5 – Channel Config Pack)."""
+    """Show current server configuration (v2.5 – Channel Config Pack)."""
     try:
         # Kontroluj, že je uživatel admin
         if not interaction.user.guild_permissions.administrator:
-            await interaction.response.send_message("❌ Musíš být администратор!")
+            await interaction.response.send_message("❌ You must be an administrator!")
             return
         
         # Načti konfiguraci z bot_data.json
@@ -1670,25 +1824,25 @@ async def config_command(interaction: discord.Interaction):
         blessing_channel = interaction.guild.get_channel(config.get("blessing_channel"))
         freegames_channel = interaction.guild.get_channel(config.get("freegames_channel"))
         
-        blessing_str = f"✅ {blessing_channel.mention}" if blessing_channel else "❌ Není nastaven"
-        freegames_str = f"✅ {freegames_channel.mention}" if freegames_channel else "❌ Není nastaven"
+        blessing_str = f"✅ {blessing_channel.mention}" if blessing_channel else "❌ Not set"
+        freegames_str = f"✅ {freegames_channel.mention}" if freegames_channel else "❌ Not set"
         
         embed = discord.Embed(
-            title="⚙️ Konfigurace serveru",
+            title="⚙️ Server Configuration",
             color=discord.Color.blue()
         )
-        embed.add_field(name="🙏 Požehnání", value=blessing_str, inline=False)
-        embed.add_field(name="💵 Hry zdarma", value=freegames_str, inline=False)
+        embed.add_field(name="🙏 Blessings", value=blessing_str, inline=False)
+        embed.add_field(name="💵 Free Games", value=freegames_str, inline=False)
         embed.add_field(
             name="💡 Tip",
-            value="Použij `/setchannel` pro změnu kanálů",
+            value="Use `/setchannel` to change channels",
             inline=False
         )
         
         await interaction.response.send_message(embed=embed)
         
     except Exception as e:
-        await interaction.response.send_message(f"❌ Chyba: {str(e)[:100]}")
+        await interaction.response.send_message(f"❌ Error: {str(e)[:100]}")
 
 # ═══════════════════════════════════════════════════════════════════════════════
 #                13. SCHEDULED TASKS – AUTOMATICKÉ ZPRÁVY
@@ -1941,11 +2095,81 @@ async def on_presence_update(before, after):
         print(f"[presence] {after.name} stopped playing: {before_game.name}")
 
 # ═══════════════════════════════════════════════════════════════════════════════
+#                 13b. VOICE STATE UPDATE – XP ZA VOICE AKTIVITU
+# ═══════════════════════════════════════════════════════════════════════════════
+
+@bot.event
+async def on_voice_state_update(member, before, after):
+    """Detekuj voice aktivitu a přiděluj XP když bot hraje hudbu."""
+    # Přeskoč boty
+    if member.bot:
+        return
+    
+    guild = member.guild
+    
+    # Uživatel se připojil k voice kanálu
+    if before.channel is None and after.channel is not None:
+        # Čekej chvíli aby se bot připojil
+        await asyncio.sleep(1)
+        
+        # Zjisti jestli bot v tom kanálu hraje hudbu
+        vc = discord.utils.get(bot.voice_clients, guild=guild)
+        if vc and vc.is_connected() and vc.channel == after.channel and vc.is_playing():
+            # ✨ Přidej XP za voice aktivitu s aktivním botem
+            success = await add_xp_to_user(member.id, reason="voice_active")
+            if success:
+                print(f"[xp] Voice: {member.name} +XP pro aktivitu s music botem")
+
+# ═══════════════════════════════════════════════════════════════════════════════
 #                 14. MINIHRY & INTERAKCE (v2.2)
 # ═══════════════════════════════════════════════════════════════════════════════
 
 # XP tracking a role progression
 user_xp = {}  # {user_id: {"xp": int, "level": str}}
+xp_cooldown = {}  # {user_id: timestamp} - Anti-cheat: prevence spam XP
+
+# ═══ XP GAIN HELPER FUNKCE ═══
+async def add_xp_to_user(user_id: int, xp_amount: int = 0, reason: str = ""):
+    """Přidej XP uživateli s anti-cheat ochranou.
+    
+    Důvody:
+    - "interaction" : Slash command (1-3 XP, 30s cooldown)
+    - "voice_active" : Voice chat s aktivním music botem (2-5 XP, 60s cooldown)
+    - "music_command" : Používání hudebních commandů (1-2 XP, 20s cooldown)
+    """
+    if user_id not in user_xp:
+        user_xp[user_id] = {"xp": 0, "level": "🟩 Věřící"}
+    
+    # Anti-cheat: cooldown check
+    now = datetime.datetime.now(datetime.timezone.utc).timestamp()
+    last_xp_time = xp_cooldown.get(user_id, 0)
+    cooldown_seconds = {
+        "interaction": 30,
+        "voice_active": 60,
+        "music_command": 20
+    }
+    
+    required_cooldown = cooldown_seconds.get(reason, 0)
+    if now - last_xp_time < required_cooldown:
+        return False  # Cooldown nebyl ještě splnit
+    
+    # Přidej randomizované XP (anti-cheat: nepředvídatelné)
+    if xp_amount == 0:
+        xp_ranges = {
+            "interaction": (1, 3),
+            "voice_active": (2, 5),
+            "music_command": (1, 2)
+        }
+        min_xp, max_xp = xp_ranges.get(reason, (1, 1))
+        xp_amount = random.randint(min_xp, max_xp)
+    
+    user_xp[user_id]["xp"] += xp_amount
+    xp_cooldown[user_id] = now
+    
+    # Uložit data
+    await save_user_xp_to_storage()
+    
+    return True
 xp_multiplier = 10  # 10 XP per win
 biblical_quiz_questions = [
     {
@@ -2129,8 +2353,8 @@ def get_user_level(xp: int) -> str:
     else:
         return "💎 Messiáš"
 
-@bot.tree.command(name="biblickykviz", description="Biblický trivia kviz – 10 otázek")
-async def biblickykviz_command(interaction: discord.Interaction):
+@bot.tree.command(name="biblicquiz", description="Biblický trivia kviz")
+async def biblicquiz_command(interaction: discord.Interaction):
     """Biblický trivia kviz s interaktivními buttony."""
     user_id = interaction.user.id
     
@@ -2215,13 +2439,9 @@ async def biblickykviz_command(interaction: discord.Interaction):
         # Krátkých pauza mezi otázkami
         await asyncio.sleep(0.5)
     
-    # Uprav XP
+    # Přidej XP přes centralizovanou funkci (s anti-cheat)
     xp_gain = score * xp_multiplier
-    user_xp[user_id]["xp"] += xp_gain
-    user_xp[user_id]["level"] = get_user_level(user_xp[user_id]["xp"])
-    
-    # Ulož XP do storage
-    await save_user_xp_to_storage()
+    await add_xp_to_user(user_id, xp_amount=xp_gain, reason="interaction")
     
     result_embed = discord.Embed(
         title="🎉 Výsledky Kvizu",
@@ -2230,7 +2450,7 @@ async def biblickykviz_command(interaction: discord.Interaction):
     )
     await interaction.followup.send(embed=result_embed)
 
-@bot.tree.command(name="versfight", description="Veršový duel s dalším hráčem")
+@bot.tree.command(name="versfight", description="Veršový duel s jiným hráčem")
 async def versfight_command(interaction: discord.Interaction, opponent: discord.User):
     """Veršový duel – náhodné verše, hlasování."""
     await interaction.response.defer()
