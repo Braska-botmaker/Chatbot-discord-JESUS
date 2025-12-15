@@ -1,4 +1,4 @@
-# 🎁 Hry Zdarma – Dokumentace (v2.6.2)
+# 🎁 Hry Zdarma – Dokumentace (v2.6.3)
 
 Kompletní guide na systém bezplatných her v Ježíši Discord Botu.
 
@@ -7,7 +7,7 @@ Kompletní guide na systém bezplatných her v Ježíši Discord Botu.
 ## 📋 Obsah
 
 * [Přehled](#-přehled)
-* [Zdoje her](#-zdroje-her)
+* [Zdroje her](#-zdroje-her)
 * [Příkazy](#-příkazy)
 * [Nastavení](#-nastavení)
 * [Automatické odesílání](#-automatické-odesílání)
@@ -18,66 +18,54 @@ Kompletní guide na systém bezplatných her v Ježíši Discord Botu.
 
 ## 🎮 Přehled
 
-Bot automaticky sbírá bezplatné hry z **5+ platforem** a odesílá je na Discord s:
+Bot automaticky sbírá bezplatné hry ze **3 spolehlivých platforem** a odesílá je na Discord s:
 
 - 🖼️ **Obrázky her** (z platformy API)
 - 💰 **Cena** – Původní cena + "ZDARMA"
 - ⏰ **Sleva do** – Kdy skončí bezplatná dostupnost
-- 🏢 **Platforma** – S logem (Epic, Steam, PlayStation, GOG, Prime Gaming)
-- 🔘 **Tlačítka** – ♥️ Wishlist, 📤 Share, 🔗 Otevřít
+- 🏢 **Platforma** – S logem (Epic Games, Steam, PlayStation Plus)
 
-### Nové v2.6.2
-- ✨ Jednotlivé barevné embedy pro každou hru (ne seznam)
-- 🔘 Interaktivní tlačítka s emoji
-- 🖼️ Automatické obrázky her
-- 📱 Optimalizované pro mobil
+### Nové v2.6.3
+- ✨ Konsolidované zdroje (3x stabilní)
+- 🔧 Odstraněny nefunkční platformy (GOG, Prime, Reddit, IsThereAnyDeal)
+- 📦 Nový `tools/free_games.py` pro testování
+- ⚙️ Čistší a lépe spravitelný kód
 
 ---
 
 ## 🌐 Zdroje her
 
-### 🟣 Epic Games
+### 🟣 Epic Games ✅
 - **URL:** `https://store-site-backend-static.ak.epicgames.com/freeGamesPromotions`
 - **Typ:** Oficiální API
 - **Frekvence:** Pondělí + Čtvrtek (změny her každý týden)
-- **Data:** Title, obrázek, cena, datum vypršení
-- **Filtr:** `discountPrice == 0`
+- **Data:** Title, obrázek (keyImages), cena, datum vypršení
+- **Filtr:** `isFreeGame == true` nebo `discountPrice == 0`
 - **Příklady:** Sims 4, Civilization, Ghostbusters atd.
+- **Status:** ✅ Pracující (2-3 hry zdarma obvykle)
 
-### 🎮 Steam
+### 🎮 Steam ✅
 - **URL:** `https://store.steampowered.com/search/?maxprice=0&specials=1`
 - **Typ:** Web scraping s regex
 - **Frekvence:** Různá (obvykle víkendy)
 - **Data:** Title, AppID (→ obrázek), cena
 - **Filtr:** Cena `0,00 Kč`, `-100%`, `Free`, nebo prázdná
+- **Regex:** `(https://store\.steampowered\.com/app/\d+[^"?]*)` s `re.DOTALL` flag
 - **Příklady:** One Gun Guy, Team Fortress 2, Dota 2
+- **Status:** ✅ Pracující (50+ her obvykle)
 
 **Steam Image URL:**
 ```
 https://shared.cloudflare.steamstatic.com/store_item_assets/steam/apps/{APP_ID}/header.jpg
 ```
 
-### 🎯 PlayStation Plus
+### 🎯 PlayStation Plus ✅
 - **URL:** `https://blog.playstation.com/tag/playstation-plus/feed/`
 - **Typ:** RSS feed
 - **Frekvence:** Měsíčně (obvykle 1. den měsíce)
 - **Data:** Nadpisy a linky z blogů
 - **Filtr:** Poslední články ze tagu `playstation-plus`
-
-### ⭐ GOG
-- **URL:** `https://www.gog.com/games/ajax/filtered?mediaType=game&price=free&sortBy=trending`
-- **Typ:** API
-- **Frekvence:** Různá
-- **Data:** Title, URL, cena
-- **Filtr:** `price=free`
-
-### 🔶 Prime Gaming
-- **URL:** `https://gaming.amazon.com/`
-- **Typ:** Web scraping + Reddit fallback
-- **Frekvence:** Týdně (Amazon mění hry každý pátek)
-- **Data:** Názvy her z Amazon stránky
-- **Fallback:** Reddit r/FreeGames vyhledávání
-- **Příklady:** Need for Speed, FIFA, Hitman atdy.
+- **Status:** ✅ Pracující (10+ článků obvykle)
 
 ---
 
@@ -91,18 +79,7 @@ Zobrazí až **10 bezplatných her** s embedy.
 /freegames
 ```
 
-**Odpověď:**
-- Jednotlivý embed pro každou hru
-- S obrázkem, cenou, datem vypršení
-- Tlačítka: ♥️ ♥ 📤 🔗
 
-### `/freegames` → Tlačítka
-
-| Tlačítko | Akce |
-|----------|------|
-| 🔗 Otevřít | Otevře store v nový okno |
-| ♥️ | Přidá do wishlistu (poznámka) |
-| 📤 | Sdílí linku přátelům |
 
 ---
 
@@ -177,8 +154,6 @@ Každý zdroj má vlastní `try/except`:
 "epic" → "🟣 Epic Games"
 "steam" → "🎮 Steam"
 "playstation" → "🎯 PlayStation Plus"
-"gog" → "⭐ GOG"
-"amazon" / "prime" → "🔶 Prime Gaming"
 ```
 
 ---
@@ -198,12 +173,12 @@ Každý zdroj má vlastní `try/except`:
 /diag
 ```
 
-### 🎁 Chybí hry z určité platformy
+### 🎁 Chybí hry
 
 **Příčiny:**
-1. Platforma nemá aktuálně zdarma hry
+1. Žádná platforma nemá aktuálně zdarma hry
 2. API je dočasně nedostupné
-3.Timeout při stažení (6s limit)
+3. Timeout při stažení (6-8s limit)
 
 **Řešení:**
 - Spusť `/freegames` ručně
@@ -211,6 +186,7 @@ Každý zdroj má vlastní `try/except`:
   ```
   [freegames] Epic error: ...
   [freegames] Steam error: ...
+  [freegames] PlayStation error: ...
   ```
 
 ### 🖼️ Chybí obrázky her
@@ -227,7 +203,6 @@ Každý zdroj má vlastní `try/except`:
 
 - Bot se ujišťuje, že text je krátký (max 70 znaků)
 - Obrázky se zobrazují správně na všech zařízeních
-- Tlačítka jsou vidět i na mobilu
 
 ---
 
@@ -247,4 +222,5 @@ Máš problém? Koukni na:
 - [CHANGELOG.md](../CHANGELOG.md) – Novějších verzí
 - [README.md](../README.md) – Hlavní dokumentace
 - [Diagnostika](/diag) – Bot diagnostic report
+- [tools/free_games.py](../tools/free_games.py) – Tool pro testování
 

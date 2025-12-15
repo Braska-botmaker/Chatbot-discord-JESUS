@@ -4,6 +4,36 @@ Všechny změny v tomto projektu jsou zaznamenány v tomto souboru.
 
 ---
 
+## [v2.6.3] – 2025-01-22
+
+### ✨ Nové funkce
+
+#### Konsolidované zdroje her zdarma 🎮
+- **Fokus na 3 stabilní zdroje:** Epic Games, Steam, PlayStation Plus
+- Obrázky pro každou hru (Epic z keyImages API, Steam z header.jpg)
+- Spolehlivost nad množstvím
+
+#### Nový tool: `tools/free_games.py` 🛠️
+- Komplexní nástroj pro testování platforem
+- Detailní hlášení stavu jednotlivých zdrojů
+- Export výsledků do JSON
+
+### ❌ Odstraněno
+
+- **GOG API** – Ztratila data (0 produktů), nepoužívat
+- **Prime Gaming** – HTTP 404, Amazon endpoint není dostupný
+- **Reddit r/FreeGames** – HTTP 403 Forbidden, anti-bot ochrana
+- **IsThereAnyDeal** – HTTP 404, API endpoint byl odebrán
+
+### 🔧 Bugfixy & Optimalizace
+
+- Steam regex s DOTALL flag pro správné parsování nových řádků
+- Odebráno 17 testovacích souborů
+- source_status dict obsahuje jen 3 klíče: epic, steam, playstation
+- Zmenšena bot.py o 152 řádků kódu
+
+---
+
 ## [v2.6.2] – 2025-12-15
 
 ### ✨ Nové funkce
