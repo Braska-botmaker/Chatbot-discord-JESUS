@@ -125,13 +125,75 @@ class FreeGamesTool:
                             if result["games_count"] >= 10:
                                 break
                             
-                            game = {
-                                "title": title,
-                                "url": f"https://store.steampowered.com/app/{app_id}",
-                                "app_id": app_id,
-                                "image": f"https://shared.cloudflare.steamstatic.com/store_item_assets/steam/apps/{app_id}/header.jpg"
-                            }
-                            result["games"].append(game)
+                            # Získej detaily ze Steam Store API
+                            try:
+                                detail_url = f"https://store.steampowered.com/api/appdetails?appids={app_id}&cc=us"
+                                detail_r = requests.get(detail_url, timeout=3)
+                                detail_data = detail_r.json()
+                                
+                                if detail_data.get(app_id, {}).get("success"):
+                                    app_data = detail_data[app_id]["data"]
+                                    
+                                    # Získej původní cenu
+                                    original_price = "N/A"
+                                    if app_data.get("price_overview"):
+                                        original_price = f"${app_data['price_overview'].get('initial', 0) / 100:.2f}"
+                                    
+                                    # Získej datum vydání
+                                    release_date = app_data.get("release_date", {}).get("date", "TBA")
+                                    
+                                    # Získej hodnocení (metacritic)
+                                    reviews = "N/A"
+                                    if app_data.get("metacritic"):
+                                        reviews = f"Metacritic: {app_data['metacritic']['score']}/100"
+                                    
+                                    # Podporované platformy
+                                    platforms = []
+                                    if app_data.get("platforms", {}).get("windows"):
+                                        platforms.append("Windows")
+                                    if app_data.get("platforms", {}).get("mac"):
+                                        platforms.append("Mac")
+                                    if app_data.get("platforms", {}).get("linux"):
+                                        platforms.append("Linux")
+                                    
+                                    game = {
+                                        "title": title,
+                                        "url": f"https://store.steampowered.com/app/{app_id}",
+                                        "app_id": app_id,
+                                        "image": f"https://shared.cloudflare.steamstatic.com/store_item_assets/steam/apps/{app_id}/header.jpg",
+                                        "original_price": original_price,
+                                        "release_date": release_date,
+                                        "reviews": reviews,
+                                        "platforms": ", ".join(platforms) if platforms else "N/A"
+                                    }
+                                    result["games"].append(game)
+                                else:
+                                    # Fallback bez detailů
+                                    game = {
+                                        "title": title,
+                                        "url": f"https://store.steampowered.com/app/{app_id}",
+                                        "app_id": app_id,
+                                        "image": f"https://shared.cloudflare.steamstatic.com/store_item_assets/steam/apps/{app_id}/header.jpg",
+                                        "original_price": "N/A",
+                                        "release_date": "N/A",
+                                        "reviews": "N/A",
+                                        "platforms": "N/A"
+                                    }
+                                    result["games"].append(game)
+                            except Exception as detail_err:
+                                print(f"[steam] Error getting details for {app_id}: {detail_err}")
+                                # Fallback
+                                game = {
+                                    "title": title,
+                                    "url": f"https://store.steampowered.com/app/{app_id}",
+                                    "app_id": app_id,
+                                    "image": f"https://shared.cloudflare.steamstatic.com/store_item_assets/steam/apps/{app_id}/header.jpg",
+                                    "original_price": "N/A",
+                                    "release_date": "N/A",
+                                    "reviews": "N/A",
+                                    "platforms": "N/A"
+                                }
+                                result["games"].append(game)
                         except Exception:
                             continue
             
