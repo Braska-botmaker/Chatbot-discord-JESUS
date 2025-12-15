@@ -1,16 +1,17 @@
 # ✝️ Ježíš Discord Bot – hudba, verše a hry zdarma 🙏
 
-**Verze:** v2.6.1 – Free Games Engine 3.0 + XP Systém | **Platform:** Raspberry Pi Ready
+**Verze:** v2.6.2 – Free Games UI & Controls | **Platform:** Raspberry Pi Ready
 
 Discord bot napsaný v Pythonu (discord.py), který umí:
 
 * 🎵 Přehrávat hudbu z URL (YouTube přes `yt-dlp`) do voice kanálu - s názvy skladeb, odhadem času fronty, blokaací duplicitních skladeb, podporou playlistů a shuffle
 * 📖 Posílat ranní a večerní zprávy s biblickým veršem
 * 🙏 Žehnat hráčům při spuštění her a reagovat na společné hraní ve voice
-* 🎁 Každý večer publikovat „Hry zdarma" z 4+ platforem (Epic, Steam, PlayStation, GOG, IsThereAnyDeal, Reddit) - nyní bez nespolehlivých Ubisoft+ a Prime Gaming
+* 🎁 Každý večer publikovat „Hry zdarma" z 5+ platforem (Epic, Steam, PlayStation, GOG, Prime Gaming) - s **individuálními embedy, obrázky, tlačítky**
+* 🔘 **NOVÉ v2.6.2:** Tlačítka na "🎵 Přehrávám" pro skip, pause, shuffle + interaktivní embedy pro hry
 * ⚙️ Konfigurovat kanály per-guild s `/setchannel` a `/config`
 * 🎮 Minihry s XP systémem (kviz, veršový duel, RNG požehnání)
-* ✨ **NOVÉ v2.6.1:** XP odměny za hudbu a hlasovou aktivitu s anti-cheat ochranou
+* ✨ XP odměny za hudbu a hlasovou aktivitu s anti-cheat ochranou
 * ℹ️ Slash commands: `/commands`, `/version`, `/diag` s automatickým autocomplete
 
 > Optimalizováno pro běh na Raspberry Pi 24/7, ale funguje i lokálně na Windows/Linux/macOS.

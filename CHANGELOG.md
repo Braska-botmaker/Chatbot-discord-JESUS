@@ -4,6 +4,51 @@ Všechny změny v tomto projektu jsou zaznamenány v tomto souboru.
 
 ---
 
+## [v2.6.2] – 2025-12-15
+
+### ✨ Nové funkce
+
+#### Free Games UI & Interactive Controls 🎮
+- **Nový design her:** Každá hra má svůj embed s:
+  - Obrázkem hry (z platformy API)
+  - Tlačítky pro interakci (♥️ Wishlist, 📤 Share, 🔗 Otevřít)
+  - Detaily: Cena, sleva do, platforma s logem
+  - Barevné embedy dle zdroje (🟣 Epic, 🎮 Steam, 🎯 PlayStation, ⭐ GOG, 🔶 Prime Gaming)
+
+- **Tlačítka na "🎵 Přehrávám":**
+  - ⏭️ **Skip** – Přeskoč na další skladbu
+  - ⏸️ **Pause/Resume** – Pozastavit/Obnovit přehrávání
+  - 🔀 **Shuffle** – Zamíchat frontu skladeb
+
+#### Prime Gaming Scraping ✅
+- Implementován scraping Amazon Prime Gaming
+- Fallback na Reddit r/FreeGames při selhání (detekce "One Gun Guy" atd.)
+- Spolehlivé mapování na 🔶 Prime Gaming logo
+
+#### Steam Free Games Filtr 🎮
+- Vylepšený regex na vyhledávání skutečně bezplatných her
+- Detekce ceny: `0,00 Kč`, `-100%`, `Free`, nebo prázdná (Steam skryje cenu)
+- Automatické stažení obrázku z AppID: `https://shared.cloudflare.steamstatic.com/store_item_assets/steam/apps/{APP_ID}/header.jpg`
+
+#### Auto-Send Free Games v 20:10 CET 📱
+- Automatické odeslání až 12 her do kanálu
+- Jednotlivé embedy s tlačítky (ne seznam v jednom embedu)
+- Informativnější footer s detaily
+
+### 🔧 Bugfixy & Optimalizace
+
+- Epic Games parser teď sbírá: keyImage, originalPrice, effectiveDate
+- Steam parser teď sbírá: obrázek z AppID
+- Inteligentní mapování zdrojů (case-insensitive)
+- Lepší error handling v bottonech (ephemeral responses)
+
+### 📚 Dokumentace
+
+- **NOVÝ SOUBOR:** `docs/FREE_GAMES.md` – Kompletní dokumentace Hry Zdarma
+- Aktualizován README.md s v2.6.2 features
+
+---
+
 ## [v2.6.1] – 2025-12-12
 
 ### ✨ Nové funkce
