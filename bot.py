@@ -1822,6 +1822,8 @@ async def freegames_command(interaction: discord.Interaction):
                 
                 # Nastav obrázek jako fullwidth
                 embed.set_image(url=featured_image)
+                
+                await interaction.followup.send(embed=embed)
                 sent += 1
             except Exception as e:
                 print(f"[freegames] Error sending PSN embed: {e}")
