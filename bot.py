@@ -1,5 +1,5 @@
 # ╔════════════════════════════════════════════════════════════════════════════╗
-# ║      Ježíš Discord Bot v2.6.3 – Free Games (Epic, Steam, PlayStation)      ║
+# ║      Ježíš Discord Bot v2.6.4 – Free Games (Epic, Steam, PlayStation)      ║
 # ║                     Kompletní přepis na slash commands                     ║
 # ║                  s Czech názvy pro maximální unikalitu                     ║
 # ╚════════════════════════════════════════════════════════════════════════════╝
@@ -643,6 +643,51 @@ async def play_next(guild: discord.Guild, text_channel: discord.TextChannel):
 #                   7. VERSE STREAK TRACKING DATA
 # ═══════════════════════════════════════════════════════════════════════════════
 
+def _extract_ps_article_image(item: ET.Element) -> str:
+    """Z RSS itemu vytáhne obrázek články (media:content / media:thumbnail / enclosure / <img> v HTML)."""
+    ns = {
+        "media": "http://search.yahoo.com/mrss/",
+        "content": "http://purl.org/rss/1.0/modules/content/",
+    }
+
+    # 1) media:content
+    media_content = item.find("media:content", ns)
+    if media_content is not None:
+        url = (media_content.attrib.get("url") or "").strip()
+        if url:
+            return url
+
+    # 2) media:thumbnail
+    media_thumb = item.find("media:thumbnail", ns)
+    if media_thumb is not None:
+        url = (media_thumb.attrib.get("url") or "").strip()
+        if url:
+            return url
+
+    # 3) enclosure
+    enclosure = item.find("enclosure")
+    if enclosure is not None:
+        url = (enclosure.attrib.get("url") or "").strip()
+        typ = (enclosure.attrib.get("type") or "").lower()
+        if url and ("image" in typ or url.lower().endswith((".png", ".jpg", ".jpeg", ".webp"))):
+            return url
+
+    # 4) content:encoded (HTML)
+    content_encoded = item.find("content:encoded", ns)
+    if content_encoded is not None and content_encoded.text:
+        m = re.search(r'<img[^>]+src="([^"]+)"', content_encoded.text, flags=re.IGNORECASE)
+        if m:
+            return m.group(1).strip()
+
+    # 5) description (HTML)
+    desc = item.find("description")
+    if desc is not None and desc.text:
+        m = re.search(r'<img[^>]+src="([^"]+)"', desc.text, flags=re.IGNORECASE)
+        if m:
+            return m.group(1).strip()
+
+    return ""
+
 def get_free_games():
     """Sbírá zdarma hry z více zdrojů: Epic, Steam, PlayStation Plus.
     
@@ -849,17 +894,23 @@ def get_free_games():
     # ═══ PLAYSTATION PLUS ═══
     try:
         ps_feed = "https://blog.playstation.com/tag/playstation-plus/feed/"
-        r = requests.get(ps_feed, timeout=6, headers={"User-Agent": "Mozilla/5.0"})
+        r = requests.get(ps_feed, timeout=8, headers={"User-Agent": "Mozilla/5.0"})
         if r.status_code == 200:
             try:
                 root = ET.fromstring(r.content)
                 items = root.findall('.//item')
                 count = 0
-                for item in items[:10]:
+
+                for item in items[:12]:
                     title_el = item.find('title')
                     link_el = item.find('link')
-                    title = title_el.text if title_el is not None else 'PlayStation Plus announcement'
-                    link = link_el.text if link_el is not None else 'https://blog.playstation.com'
+
+                    title = title_el.text.strip() if title_el is not None and title_el.text else 'PlayStation Plus announcement'
+                    link = link_el.text.strip() if link_el is not None and link_el.text else 'https://blog.playstation.com'
+
+                    # ✅ vytáhni obrázek přímo z články
+                    image = _extract_ps_article_image(item)
+
                     key = (title, link)
                     if key not in seen and count < 8:
                         seen.add(key)
@@ -867,7 +918,7 @@ def get_free_games():
                             "title": title,
                             "url": link,
                             "source": "PlayStation Plus",
-                            "image": "https://www.playstation.com/content/dam/corporate/images/logos/playstation-logo.png",
+                            "image": image,  # ✅ obrázek z články (bez loga)
                             "original_price": "N/A",
                             "release_date": "Monthly",
                             "reviews": "N/A",
@@ -875,8 +926,11 @@ def get_free_games():
                         })
                         source_status["playstation"] = True
                         count += 1
+
             except Exception as e:
                 print(f"[freegames] PlayStation parse error: {e}")
+        else:
+            print(f"[freegames] PlayStation HTTP {r.status_code}")
     except Exception as e:
         print(f"[freegames] PlayStation error: {e}")
 
@@ -1775,17 +1829,14 @@ async def freegames_command(interaction: discord.Interaction):
                     description=psn_list
                 )
                 
-                # Fallback: statické PS logo pokud nic není
-                if not featured_image:
-                    featured_image = "https://www.playstation.com/content/dam/corporate/images/logos/playstation-logo.png"
+                # Obrázek jen když existuje (bez fallback loga)
+                if featured_image:
+                    embed.set_image(url=featured_image)
                 
                 embed.add_field(name="💰 Cena", value="**ZDARMA** (pro členy PS+)", inline=False)
                 embed.add_field(name="📅 Katalog", value="Měsíční aktualizace", inline=False)
                 embed.add_field(name="💻 Platformy", value="PlayStation", inline=False)
                 embed.set_footer(text=f"Celkem {len(psn_articles)} článků • Klikni na název pro otevření")
-                
-                # Nastav obrázek jako fullwidth
-                embed.set_image(url=featured_image)
                 
                 await interaction.followup.send(embed=embed)
                 sent += 1
@@ -1825,7 +1876,7 @@ async def version_command(interaction: discord.Interaction):
     """Show bot version and changelog."""
     try:
         embed = discord.Embed(title="ℹ️ Jesus Discord Bot", color=discord.Color.gold())
-        embed.add_field(name="Version", value="v2.6.3 – Free Games (Epic, Steam, PlayStation)", inline=False)
+        embed.add_field(name="Version", value="v2.6.4 – Free Games (Epic, Steam, PlayStation)", inline=False)
         embed.add_field(name="Current Features", value="""
 🎮 Multi-Platform Free Games (Epic Games, Steam, PlayStation Plus)
 ⚙️ `/setchannel` – Configure channels per-guild
@@ -1844,7 +1895,7 @@ async def version_command(interaction: discord.Interaction):
 async def commands_command(interaction: discord.Interaction):
     """Show all available commands."""
     try:
-        embed = discord.Embed(title="📋 Commands – Jesus Discord Bot v2.6.3", color=discord.Color.blue())
+        embed = discord.Embed(title="📋 Commands – Jesus Discord Bot v2.6.4", color=discord.Color.blue())
         embed.add_field(name="🎵 Music (+XP)", value="""
 /yt <url> – Přidej skladbu/playlist (YouTube, +1-2 XP)
 /skip – Přeskoči skladbu (+1-2 XP)
@@ -1900,7 +1951,7 @@ async def diag_command(interaction: discord.Interaction):
     voice_count = len(bot.voice_clients)
     embed.add_field(name="🎤 Voice", value=f"Connected: {voice_count}", inline=True)
     if bot.user:
-        embed.add_field(name="⏱️ Version", value="v2.6.3\nFree Games (Epic, Steam, PSN)", inline=True)
+        embed.add_field(name="⏱️ Version", value="v2.6.4\nFree Games (Epic, Steam, PSN)", inline=True)
     await interaction.followup.send(embed=embed)
 
 @bot.tree.command(name="setchannel", description="Nastav kanál pro požehnání nebo hry zdarma")
