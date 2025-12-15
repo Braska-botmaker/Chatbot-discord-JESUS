@@ -1722,9 +1722,9 @@ async def freegames_command(interaction: discord.Interaction):
                     color=color
                 )
                 
-                # Nastav thumbnail/obrázek NAHORU vlevo
+                # Nastav obrázek NAHORU (full-width)
                 if image:
-                    embed.set_thumbnail(url=image)
+                    embed.set_image(url=image)
                 
                 # Přidej informace
                 if original_price and original_price != "N/A":
@@ -1769,8 +1769,9 @@ async def freegames_command(interaction: discord.Interaction):
                 featured_image = ""
                 if psn_articles:
                     first_article_url = psn_articles[0].get("url", "")
+                    print(f"[freegames] Fetching PSN image from: {first_article_url}")
                     try:
-                        article_r = requests.get(first_article_url, timeout=3, headers={"User-Agent": "Mozilla/5.0"})
+                        article_r = requests.get(first_article_url, timeout=5, headers={"User-Agent": "Mozilla/5.0"})
                         if article_r.status_code == 200:
                             # Hledej og:image meta tag (different formats)
                             patterns = [
@@ -1778,15 +1779,29 @@ async def freegames_command(interaction: discord.Interaction):
                                 r'<meta\s+property="og:image"\s+content=\'([^\']+)\'',
                                 r'<meta\s+name="og:image"\s+content="([^"]+)"',
                                 r'<meta\s+content="([^"]+)"\s+property="og:image"',
-                                r'<img[^>]*src="([^"]*playstation[^"]*)"[^>]*class="featured'
+                                r'<meta\s+property="twitter:image"\s+content="([^"]+)"',
+                                r'<img[^>]*class="[^"]*featured[^"]*"[^>]*src="([^"]+)"'
                             ]
                             
-                            for pattern in patterns:
-                                og_match = re.search(pattern, article_r.text)
+                            for i, pattern in enumerate(patterns):
+                                og_match = re.search(pattern, article_r.text, re.IGNORECASE)
                                 if og_match:
                                     featured_image = og_match.group(1)
-                                    if featured_image.startswith('http'):
+                                    print(f"[freegames] Found image (pattern {i}): {featured_image[:100]}")
+                                    if featured_image and featured_image.startswith('http'):
                                         break
+                            
+                            if not featured_image:
+                                print(f"[freegames] No og:image found, trying alternative")
+                                # Zkus najít všechny img tags
+                                img_pattern = re.compile(r'<img[^>]*src="([^"]*\.(?:jpg|jpeg|png|webp)[^"]*)"[^>]*(?:alt="[^"]*game|class="[^"]*hero|class="[^"]*featured)?')
+                                img_matches = img_pattern.findall(article_r.text)
+                                if img_matches:
+                                    for img_url in img_matches:
+                                        if 'playstation' in img_url.lower() or 'blog' in img_url.lower():
+                                            featured_image = img_url
+                                            print(f"[freegames] Found alternative image: {featured_image[:100]}")
+                                            break
                     except Exception as img_err:
                         print(f"[freegames] Error fetching PSN featured image: {img_err}")
                 
@@ -1797,12 +1812,15 @@ async def freegames_command(interaction: discord.Interaction):
                     description=psn_list
                 )
                 
-                # Nastav obrázek NAHORU
-                if featured_image:
-                    embed.set_thumbnail(url=featured_image)
+                # Nastav obrázek NAHORU (full-width)
+                if featured_image and featured_image.startswith('http'):
+                    embed.set_image(url=featured_image)
+                    print(f"[freegames] Setting PSN image: {featured_image[:100]}")
                 else:
-                    # Fallback na PS logo
-                    embed.set_thumbnail(url="https://www.playstation.com/content/dam/corporate/images/logos/playstation-logo.png")
+                    # Fallback na PS+ featured image (CDN)
+                    fallback_url = "https://www.playstation.com/content/dam/corporate/images/logos/playstation-plus-logo.png"
+                    embed.set_image(url=fallback_url)
+                    print(f"[freegames] Using PSN fallback image")
                 
                 embed.add_field(name="💰 Cena", value="**ZDARMA** (pro členy PS+)", inline=False)
                 embed.add_field(name="📅 Katalog", value="Měsíční aktualizace", inline=False)
