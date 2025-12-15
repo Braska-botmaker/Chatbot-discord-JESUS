@@ -1775,11 +1775,9 @@ async def freegames_command(interaction: discord.Interaction):
                         if r.status_code == 200:
                             # Hledej og:image meta tag (více variant)
                             patterns = [
-                                r'<meta\s+property=["\'](og:image)["\'][^>]*content=["\'](https?://[^\'"]+)["\']',
-                                r'<meta\s+content=["\'](https?://[^\'"]+)["\'][^>]*property=["\'](og:image)["\']',
-                                r'<meta\s+property=["\']og:image["\'].*?content=["\'](https?://[^\'"]+)["\']',
-                                r'<img[^>]*class=["\']([^\'"]*featured[^\'"]*)["\'][^>]*src=["\'](https?://[^\'"]+)["\']',
-                                r'<img[^>]*src=["\'](https?://[^\'"]+)["\'][^>]*class=["\']([^\'"]*featured[^\'"]*)["\']'
+                                r'<meta\s+property=["\']og:image["\'][^>]*content=["\'](https?://[^\'"]+)["\']',
+                                r'<meta\s+content=["\'](https?://[^\'"]+)["\'][^>]*property=["\']og:image["\']',
+                                r'<meta[^>]*property=["\']og:image["\'][^>]*content=["\'](https?://[^\'"]+\.(?:jpg|jpeg|png|webp)(?:\?[^\'"]*)?)["\']',
                             ]
                             
                             for i, pattern in enumerate(patterns):
@@ -1789,18 +1787,17 @@ async def freegames_command(interaction: discord.Interaction):
                                     for group in match.groups():
                                         if group and group.startswith('http'):
                                             featured_image = group
-                                            print(f"[freegames] Found PSN image (pattern {i}): {featured_image[:60]}")
+                                            print(f"[freegames] Found PSN image (pattern {i}): {featured_image[:80]}")
                                             break
                                     if featured_image:
                                         break
                             
                             if not featured_image:
-                                print(f"[freegames] No image found in PSN article HTML")
-                                # Zkus najít JAKÝKOLIV obrázek z blog domeny
-                                img_matches = re.findall(r'<img[^>]*src=["\'](https?://blog\.playstation\.com[^\'"]+)["\']', r.text, re.IGNORECASE)
-                                if img_matches:
-                                    featured_image = img_matches[0]
-                                    print(f"[freegames] Found blog image: {featured_image[:60]}")
+                                print(f"[freegames] No og:image found, checking HTML snippet...")
+                                # Podívej se co je v og:image
+                                og_snippet = re.search(r'<meta\s+property=["\']og:image["\'][^>]*>', r.text, re.IGNORECASE)
+                                if og_snippet:
+                                    print(f"[freegames] og:image tag: {og_snippet.group(0)[:200]}")
                     except Exception as e:
                         print(f"[freegames] Error fetching PSN image: {e}")
                 
