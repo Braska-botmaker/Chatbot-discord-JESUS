@@ -655,6 +655,7 @@ def _extract_ps_article_image(item: ET.Element) -> str:
     if media_content is not None:
         url = (media_content.attrib.get("url") or "").strip()
         if url:
+            print(f"[extract_image] ✅ Našel media:content: {url[:80]}...")
             return url
 
     # 2) media:thumbnail
@@ -662,6 +663,7 @@ def _extract_ps_article_image(item: ET.Element) -> str:
     if media_thumb is not None:
         url = (media_thumb.attrib.get("url") or "").strip()
         if url:
+            print(f"[extract_image] ✅ Našel media:thumbnail: {url[:80]}...")
             return url
 
     # 3) enclosure
@@ -670,6 +672,7 @@ def _extract_ps_article_image(item: ET.Element) -> str:
         url = (enclosure.attrib.get("url") or "").strip()
         typ = (enclosure.attrib.get("type") or "").lower()
         if url and ("image" in typ or url.lower().endswith((".png", ".jpg", ".jpeg", ".webp"))):
+            print(f"[extract_image] ✅ Našel enclosure: {url[:80]}...")
             return url
 
     # 4) content:encoded (HTML)
@@ -677,15 +680,48 @@ def _extract_ps_article_image(item: ET.Element) -> str:
     if content_encoded is not None and content_encoded.text:
         m = re.search(r'<img[^>]+src="([^"]+)"', content_encoded.text, flags=re.IGNORECASE)
         if m:
-            return m.group(1).strip()
+            url = m.group(1).strip()
+            print(f"[extract_image] ✅ Našel img v content:encoded: {url[:80]}...")
+            return url
 
     # 5) description (HTML)
     desc = item.find("description")
     if desc is not None and desc.text:
         m = re.search(r'<img[^>]+src="([^"]+)"', desc.text, flags=re.IGNORECASE)
         if m:
-            return m.group(1).strip()
+            url = m.group(1).strip()
+            print(f"[extract_image] ✅ Našel img v description: {url[:80]}...")
+            return url
+    
+    # 6) Zkus scrapeovat přímo z linku v artiklu
+    link_el = item.find("link")
+    if link_el is not None and link_el.text:
+        article_url = link_el.text.strip()
+        print(f"[extract_image] 🔍 Scrapeuju článek: {article_url}")
+        try:
+            r = requests.get(article_url, timeout=5, headers={"User-Agent": "Mozilla/5.0"})
+            if r.status_code == 200:
+                # Hledej og:image meta tag (Open Graph)
+                m = re.search(r'<meta\s+property="og:image"\s+content="([^"]+)"', r.text, flags=re.IGNORECASE)
+                if m:
+                    img_url = m.group(1).strip()
+                    if img_url:
+                        print(f"[extract_image] ✅ Našel og:image: {img_url[:80]}...")
+                        return img_url
+                
+                # Hledej libovolnou <img> značku v článku
+                m = re.search(r'<img[^>]+src="([^"]+)"[^>]*>', r.text, flags=re.IGNORECASE)
+                if m:
+                    img_url = m.group(1).strip()
+                    if img_url and "pixel" not in img_url.lower():  # Skip pixel/tracking images
+                        print(f"[extract_image] ✅ Našel img v HTML: {img_url[:80]}...")
+                        return img_url
+                
+                print(f"[extract_image] ❌ Žádný obrázek v článku: {article_url}")
+        except Exception as e:
+            print(f"[extract_image] ❌ Chyba při scrapování {article_url}: {e}")
 
+    print(f"[extract_image] ❌ Žádný obrázek nenalezen")
     return ""
 
 def get_free_games():
@@ -908,8 +944,12 @@ def get_free_games():
                     title = title_el.text.strip() if title_el is not None and title_el.text else 'PlayStation Plus announcement'
                     link = link_el.text.strip() if link_el is not None and link_el.text else 'https://blog.playstation.com'
 
-                    # ✅ vytáhni obrázek přímo z články
+                    # ✅ vytáhni obrázek přímo z článku
                     image = _extract_ps_article_image(item)
+                    
+                    # Fallback: pokud helper nic nenajde, vrať PS logo
+                    if not image:
+                        image = "https://www.playstation.com/content/dam/corporate/images/logos/playstation-logo.png"
 
                     key = (title, link)
                     if key not in seen and count < 8:
