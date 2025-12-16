@@ -1,7 +1,6 @@
 # ╔════════════════════════════════════════════════════════════════════════════╗
-# ║      Ježíš Discord Bot v2.6.4 – Free Games (Epic, Steam, PlayStation)      ║
+# ║      Ježíš Discord Bot v2.6.5 – Free Games (Epic, Steam, PlayStation)      ║
 # ║                     Kompletní přepis na slash commands                     ║
-# ║                  s Czech názvy pro maximální unikalitu                     ║
 # ╚════════════════════════════════════════════════════════════════════════════╝
 
 # ═══════════════════════════════════════════════════════════════════════════════
@@ -1809,36 +1808,33 @@ async def freegames_command(interaction: discord.Interaction):
                     color = discord.Color.purple()
                     logo = "🎁"
                 
-                # Vytvoř embed
+                # Vytvoř embed s hezčím rozložením
                 embed = discord.Embed(
-                    title=title,
+                    title=source,
                     url=url,
-                    color=color
+                    color=color,
+                    description=title
                 )
                 
-                # Nastav obrázek NAHORU (full-width)
+                # Cena a Datum vydání vedle sebe
+                price_text = f"~~{original_price}~~ **ZDARMA**" if (original_price and original_price != "N/A") else "**ZDARMA**"
+                embed.add_field(name="Price:", value=price_text, inline=True)
+                
+                if release_date and release_date != "N/A":
+                    embed.add_field(name="Release Date:", value=release_date, inline=True)
+                
+                # Hodnocení a Free Until vedle sebe
+                if reviews and reviews != "N/A":
+                    embed.add_field(name="All Reviews:", value=reviews, inline=True)
+                
+                if expire_date:
+                    embed.add_field(name="⏰ Free Until:", value=expire_date, inline=True)
+                
+                # Obrázek dolů (full-width)
                 if image:
                     embed.set_image(url=image)
                 
-                # Přidej informace
-                if original_price and original_price != "N/A":
-                    embed.add_field(name="💰 Cena", value=f"~~{original_price}~~ **ZDARMA**", inline=False)
-                else:
-                    embed.add_field(name="💰 Cena", value="**ZDARMA**", inline=False)
-                
-                if expire_date:
-                    embed.add_field(name="⏰ Sleva do", value=expire_date, inline=False)
-                
-                # Zobraz info pro všechny platformy
-                if release_date and release_date != "N/A":
-                    embed.add_field(name="📅 Vydáno", value=release_date, inline=True)
-                if reviews and reviews != "N/A":
-                    embed.add_field(name="⭐ Hodnocení", value=reviews, inline=True)
-                if platforms and platforms != "N/A":
-                    embed.add_field(name="💻 Platformy", value=platforms, inline=False)
-                
-                embed.add_field(name="🏢 Zdroj", value=f"{logo} {source}", inline=False)
-                embed.set_footer(text="Klikni na název pro otevření")
+                embed.set_footer(text=f"Click to view on {source}")
                 
                 await interaction.followup.send(embed=embed)
                 sent += 1
@@ -2126,7 +2122,7 @@ async def send_night_message():
 
 @tasks.loop(minutes=1)
 async def send_free_games():
-    """Odeslat zdarma hry v 20:10 CET s tlačítky (v2.8)."""
+    """Odeslat zdarma hry v 20:10 CET – stejné jako /freegames."""
     now = datetime.datetime.now(pytz.timezone("Europe/Prague"))
     if now.hour == 20 and now.minute == 10:
         for guild in bot.guilds:
@@ -2139,16 +2135,18 @@ async def send_free_games():
                 
                 if not free_games:
                     try:
-                        await channel.send("❌ Dnes nejsou dostupné žádné zdarma hry")
+                        await channel.send("❌ Žádné zdarma hry nenalezeny")
                     except Exception as e:
                         print(f"[send_free_games] Error sending empty message: {e}")
                     continue
                 
-
+                # Oddělení her od PSN článků
+                regular_games = [g for g in free_games if "playstation" not in g.get("source", "").lower()]
+                psn_articles = [g for g in free_games if "playstation" in g.get("source", "").lower()]
                 
-                # Pošli max 12 her na server
+                # Pošli max 10 regulárních her (aby to nebyl spam)
                 sent = 0
-                for game in free_games[:12]:
+                for game in regular_games[:10]:
                     try:
                         title = game.get("title", "Unknown")
                         url = game.get("url", "")
@@ -2156,17 +2154,17 @@ async def send_free_games():
                         image = game.get("image", "")
                         original_price = game.get("original_price", "N/A")
                         expire_date = game.get("expire_date", "")
+                        release_date = game.get("release_date", "N/A")
+                        reviews = game.get("reviews", "N/A")
+                        platforms = game.get("platforms", "N/A")
                         
-                        # Urči barvu a logo podle zdroje
+                        # Urči barvu podle zdroje
                         if "epic" in source.lower():
                             color = discord.Color.from_rgb(75, 0, 130)
                             logo = "🟣"
                         elif "steam" in source.lower():
                             color = discord.Color.from_rgb(0, 0, 0)
                             logo = "🎮"
-                        elif "playstation" in source.lower():
-                            color = discord.Color.from_rgb(0, 112, 209)
-                            logo = "🎯"
                         elif "gog" in source.lower():
                             color = discord.Color.from_rgb(255, 215, 0)
                             logo = "⭐"
@@ -2177,36 +2175,78 @@ async def send_free_games():
                             color = discord.Color.purple()
                             logo = "🎁"
                         
-                        # Vytvoř embed
+                        # Vytvoř embed s hezčím rozložením
                         embed = discord.Embed(
-                            title=title,
+                            title=source,
                             url=url,
-                            color=color
+                            color=color,
+                            description=title
                         )
                         
-                        # Nastav obrázek
+                        # Cena a Datum vydání vedle sebe
+                        price_text = f"~~{original_price}~~ **ZDARMA**" if (original_price and original_price != "N/A") else "**ZDARMA**"
+                        embed.add_field(name="Price:", value=price_text, inline=True)
+                        
+                        if release_date and release_date != "N/A":
+                            embed.add_field(name="Release Date:", value=release_date, inline=True)
+                        
+                        # Hodnocení a Free Until vedle sebe
+                        if reviews and reviews != "N/A":
+                            embed.add_field(name="All Reviews:", value=reviews, inline=True)
+                        
+                        if expire_date:
+                            embed.add_field(name="⏰ Free Until:", value=expire_date, inline=True)
+                        
+                        # Obrázek dolů (full-width)
                         if image:
                             embed.set_image(url=image)
                         
-                        # Přidej informace
-                        if original_price and original_price != "N/A":
-                            embed.add_field(name="💰 Cena", value=f"~~{original_price}~~ **ZDARMA**", inline=False)
-                        else:
-                            embed.add_field(name="💰 Cena", value="**ZDARMA**", inline=False)
-                        
-                        if expire_date:
-                            embed.add_field(name="⏰ Sleva do", value=expire_date, inline=False)
-                        
-                        embed.add_field(name="🏢 Platforma", value=f"{logo} {source}", inline=False)
-                        embed.set_footer(text="Klikni na název pro otevření")
+                        embed.set_footer(text=f"Click to view on {source}")
                         
                         await channel.send(embed=embed)
                         sent += 1
                     except Exception as e:
-                        print(f"[send_free_games] Error sending game embed in {guild.name}: {e}")
+                        print(f"[send_free_games] Error sending game embed: {e}")
                         continue
                 
-                print(f"[send_free_games] Sent {sent} games to {guild.name}")
+                # Pošli všechny PSN články dohromady v jednom embedu
+                if psn_articles:
+                    try:
+                        # Vytvoř seznam PSN článků s links
+                        psn_list = ""
+                        for article in psn_articles[:8]:
+                            title = article.get("title", "Unknown")
+                            url = article.get("url", "")
+                            # Zkrátit dlouhé názvy
+                            if len(title) > 70:
+                                title = title[:67] + "..."
+                            psn_list += f"• [{title}]({url})\n"
+                        
+                        # Vezmi obrázek z dat - už ho máme z RSS feedu
+                        featured_image = psn_articles[0].get("image", "") if psn_articles else ""
+                        
+                        # Vytvoř embed
+                        embed = discord.Embed(
+                            title="🎯 PlayStation Plus",
+                            color=discord.Color.from_rgb(0, 112, 209),
+                            description=psn_list
+                        )
+                        
+                        # Obrázek jen když existuje (bez fallback loga)
+                        if featured_image:
+                            embed.set_image(url=featured_image)
+                        
+                        embed.add_field(name="💰 Cena", value="**ZDARMA** (pro členy PS+)", inline=False)
+                        embed.add_field(name="📅 Katalog", value="Měsíční aktualizace", inline=False)
+                        embed.add_field(name="💻 Platformy", value="PlayStation", inline=False)
+                        embed.set_footer(text=f"Celkem {len(psn_articles)} článků • Klikni na název pro otevření")
+                        
+                        await channel.send(embed=embed)
+                        sent += 1
+                    except Exception as e:
+                        print(f"[send_free_games] Error sending PSN embed: {e}")
+                
+                print(f"[send_free_games] Sent {sent} items to {guild.name}")
                 
             except Exception as e:
                 print(f"[send_free_games] Error in {guild.name}: {type(e).__name__}: {e}")

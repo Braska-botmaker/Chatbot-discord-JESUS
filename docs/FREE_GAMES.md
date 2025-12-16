@@ -1,4 +1,4 @@
-# 🎁 Hry Zdarma – Dokumentace (v2.6.3)
+# 🎁 Hry Zdarma – Dokumentace (v2.6.5)
 
 Kompletní guide na systém bezplatných her v Ježíši Discord Botu.
 
@@ -20,16 +20,17 @@ Kompletní guide na systém bezplatných her v Ježíši Discord Botu.
 
 Bot automaticky sbírá bezplatné hry ze **3 spolehlivých platforem** a odesílá je na Discord s:
 
-- 🖼️ **Obrázky her** (z platformy API)
-- 💰 **Cena** – Původní cena + "ZDARMA"
-- ⏰ **Sleva do** – Kdy skončí bezplatná dostupnost
-- 🏢 **Platforma** – S logem (Epic Games, Steam, PlayStation Plus)
+- 🖼️ **Obrázky her** – umístěny dolů v embedu (full-width)
+- 💰 **Cena** – Původní cena + "ZDARMA" **vedle Release Date**
+- 📅 **Release Date** – Datum vydání **vedle Price**
+- ⭐ **Reviews** – Hodnocení **vedle Free Until**
+- ⏰ **Free Until** – Kdy skončí bezplatná dostupnost **vedle Reviews**
 
-### Nové v2.6.3
-- ✨ Konsolidované zdroje (3x stabilní)
-- 🔧 Odstraněny nefunkční platformy (GOG, Prime, Reddit, IsThereAnyDeal)
-- 📦 Nový `tools/free_games.py` pro testování
-- ⚙️ Čistší a lépe spravitelný kód
+### Nové v2.6.5
+- ✨ **Jednotný design** – `/freegames` příkaz = automatické odesílání (20:10 CET)
+- 🎯 **PlayStation Plus** – Všechny články v **jednom embedu**
+- 📊 **Lepší čitelnost** – Pole organizována do 2 sloupců
+- 🗑️ **Odstraněno:** Supported Platforms pole
 
 ---
 

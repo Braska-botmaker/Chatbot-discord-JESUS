@@ -4,6 +4,27 @@ Všechny změny v tomto projektu jsou zaznamenány v tomto souboru.
 
 ---
 
+## [v2.6.5] – 2025-01-22
+
+### ✨ Nové funkce
+
+#### Jednotný design embeda her zdarma 🎨
+- **Synchronizace `/freegames` a automatického posílání** – Obě metody nyní používají identický formát
+- **Lepší čitelnost polí:**
+  - Price a Release Date **vedle sebe** (inline)
+  - Reviews a Free Until **vedle sebe** (inline)
+  - Obrázek umístěn **dolů** (full-width na konci)
+- **PlayStation Plus články** – Všechny články v **jednom embedu** se seznamem odkazů
+- **Odstraněno:** Supported Platforms pole (zbytečná informace)
+
+### 🎯 Vylepšení
+
+- Konzistentní vzhled napříč `/freegames` příkazem a automatickým odesílání (20:10 CET)
+- Lepší organizace informací v embedech
+- Čitelnější formátování pro Discord uživatele
+
+---
+
 ## [v2.6.3] – 2025-01-22
 
 ### ✨ Nové funkce
