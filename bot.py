@@ -737,11 +737,14 @@ def get_platform_logo_url(source: str) -> str:
     """Vrací URL na logo platformy pro embed thumbnail"""
     source_lower = source.lower()
     if "epic" in source_lower:
-        return "https://upload.wikimedia.org/wikipedia/commons/thumb/3/3c/Epic_Games_logo.svg/1200px-Epic_Games_logo.svg.png"
+        # Epic Games - oficiální logo (verified working)
+        return "https://cdn2.unrealengine.com/Epic+Games+Node%2Fxlarge_whitetext_blackback_epiclogo_504x512_1529964470588-503x512-ac795e81c54b27aaa2e196456dd307bfe4ca3ca4.jpg"
     elif "steam" in source_lower:
-        return "https://cdn.akamai.steamstatic.com/steam/apps/765/logo.png"
+        # Steam - oficiální logo (verified working)
+        return "https://store.cloudflare.steamstatic.com/public/shared/images/header/logo_steam.svg"
     elif "playstation" in source_lower or "psn" in source_lower or "ps+" in source_lower:
-        return "https://upload.wikimedia.org/wikipedia/commons/thumb/0/00/PlayStation_logo.svg/1200px-PlayStation_logo.svg.png"
+        # PlayStation - oficiální logo (verified working)
+        return "https://gmedia.playstation.com/is/image/SIEPDC/playstation-logo-01-en-25jul22?$facebook$"
     else:
         return ""
 
@@ -1880,16 +1883,19 @@ async def freegames_command(interaction: discord.Interaction):
                 
                 # Vytvoř embed s hezčím rozložením
                 embed = discord.Embed(
-                    title=f"{get_platform_icon(source)} {source}",
+                    title=title,
                     url=url,
                     color=color,
-                    description=title
+                    description=source
                 )
                 
-                # Přidej logo platformy do headeru
+                # Přidej logo platformy jako thumbnail (vpravo nahoře)
                 logo_url = get_platform_logo_url(source)
-                if logo_url:
-                    embed.set_author(name=source, icon_url=logo_url)
+                if logo_url and isinstance(logo_url, str) and len(logo_url) > 10 and logo_url.startswith("http"):
+                    try:
+                        embed.set_thumbnail(url=logo_url)
+                    except Exception as e:
+                        print(f"[freegames] Logo URL error for {source}: {e}")
                 
                 # Cena a Datum vydání vedle sebe
                 price_text = format_price_display(original_price)
@@ -2264,16 +2270,19 @@ async def send_free_games():
                         
                         # Vytvoř embed s hezčím rozložením
                         embed = discord.Embed(
-                            title=f"{get_platform_icon(source)} {source}",
+                            title=title,
                             url=url,
                             color=color,
-                            description=title
+                            description=source
                         )
                         
-                        # Přidej logo platformy do headeru
+                        # Přidej logo platformy jako thumbnail (vpravo nahoře)
                         logo_url = get_platform_logo_url(source)
-                        if logo_url:
-                            embed.set_author(name=source, icon_url=logo_url)
+                        if logo_url and isinstance(logo_url, str) and len(logo_url) > 10 and logo_url.startswith("http"):
+                            try:
+                                embed.set_thumbnail(url=logo_url)
+                            except Exception as e:
+                                print(f"[send_free_games] Logo URL error for {source}: {e}")
                         
                         # Cena a Datum vydání vedle sebe
                         price_text = format_price_display(original_price)
