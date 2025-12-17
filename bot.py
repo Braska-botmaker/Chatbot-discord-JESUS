@@ -1,5 +1,5 @@
 # ╔════════════════════════════════════════════════════════════════════════════╗
-# ║      Ježíš Discord Bot v2.6.5 – Free Games (Epic, Steam, PlayStation)      ║
+# ║      Ježíš Discord Bot v2.6.6 – Free Games (Epic, Steam, PlayStation)      ║
 # ║                     Kompletní přepis na slash commands                     ║
 # ╚════════════════════════════════════════════════════════════════════════════╝
 
@@ -723,6 +723,29 @@ def _extract_ps_article_image(item: ET.Element) -> str:
     print(f"[extract_image] ❌ Žádný obrázek nenalezen")
     return ""
 
+def format_price_display(original_price: str) -> str:
+    """Formátuje zobrazení ceny - přeškrtnuta původní + ZDARMA pod ní"""
+    if original_price and original_price != "N/A" and original_price != "0" and original_price != "Zdarma":
+        return f"~~{original_price}~~\n**ZDARMA**"
+    return "**ZDARMA**"
+
+def get_platform_icon(source: str) -> str:
+    """Vrací emoji ikonu podle platformy/zdroje"""
+    return "🎮"  # Jeden ovladač pro všechny platformy
+
+def get_platform_logo_url(source: str) -> str:
+    """Vrací URL na logo platformy pro embed thumbnail"""
+    source_lower = source.lower()
+    if "epic" in source_lower:
+        return "https://upload.wikimedia.org/wikipedia/commons/thumb/3/3c/Epic_Games_logo.svg/1200px-Epic_Games_logo.svg.png"
+    elif "steam" in source_lower:
+        return "https://cdn.akamai.steamstatic.com/steam/apps/765/logo.png"
+    elif "playstation" in source_lower or "psn" in source_lower or "ps+" in source_lower:
+        return "https://upload.wikimedia.org/wikipedia/commons/thumb/0/00/PlayStation_logo.svg/1200px-PlayStation_logo.svg.png"
+    else:
+        return ""
+
+
 def get_free_games():
     """Sbírá zdarma hry z více zdrojů: Epic, Steam, PlayStation Plus.
     
@@ -788,17 +811,65 @@ def get_free_games():
                             if element.get("releaseDate"):
                                 release_date = element.get("releaseDate", "TBA")
                             
+                            # Kdy skončí být zdarma
+                            expire_date = "Permanent"
+                            # Zkus najít endDate v promotions
+                            promo = element.get("promotions", {})
+                            if promo:
+                                promo_offers = promo.get("promotionalOffers", [])
+                                if promo_offers and len(promo_offers) > 0:
+                                    offers = promo_offers[0].get("promotionalOffers", [])
+                                    if offers and len(offers) > 0:
+                                        end_date = offers[0].get("endDate")
+                                        if end_date:
+                                            # Převeď ISO format na čitelnější
+                                            from datetime import datetime
+                                            try:
+                                                dt = datetime.fromisoformat(end_date.replace('Z', '+00:00'))
+                                                expire_date = dt.strftime("%d.%m.%Y %H:%M")
+                                            except:
+                                                expire_date = end_date
+                            
                             key = (title, url)
                             if key not in seen:
                                 seen.add(key)
+                                
+                                # Hledej slevu z promotions
+                                reviews = "Zdarma"
+                                promo = element.get("promotions", {})
+                                if promo:
+                                    promo_offers = promo.get("promotionalOffers", [])
+                                    if promo_offers and len(promo_offers) > 0:
+                                        offers = promo_offers[0].get("promotionalOffers", [])
+                                        if offers and len(offers) > 0:
+                                            discount = offers[0].get("discountSetting", {}).get("discountPercentage")
+                                            if discount is not None:
+                                                if discount == 0:
+                                                    reviews = "100% sleva"
+                                                else:
+                                                    reviews = f"{discount}% sleva"
+                                
+                                # POZNÁMKA: Tahej původní cenu z fmtPrice
+                                # OMEZENÍ: Pro free games vrací API všechny ceny jako 0
+                                # fmtPrice.originalPrice = "0" nebo "Zdarma" 
+                                # Nesmysluplné, takže raději používáme "Zdarma"
+                                # Pokud chceme skutečnou cenu, musíme scrapovat web, což je komplikované
+                                original_price = "Zdarma"
+                                fmt_price = total_price.get("fmtPrice", {})
+                                if isinstance(fmt_price, dict):
+                                    orig_price_str = fmt_price.get("originalPrice", "")
+                                    # Filtruj "0" a "Zdarma" hodnoty
+                                    if orig_price_str and orig_price_str not in ("0", "Zdarma"):
+                                        original_price = orig_price_str
+                                
                                 games.append({
                                     "title": title,
                                     "url": url,
                                     "source": "Epic Games",
                                     "image": image,
-                                    "original_price": "N/A",
-                                    "release_date": release_date,
-                                    "reviews": "N/A",
+                                    "original_price": original_price,
+                                    "expire_date": expire_date,
+                                    "reviews": reviews,
                                     "platforms": "Multi-platform"
                                 })
                                 source_status["epic"] = True
@@ -807,124 +878,116 @@ def get_free_games():
     except Exception as e:
         print(f"[freegames] Epic error: {e}")
 
-    # ═══ STEAM (limited-time free games) ═══
-    # Získej pouze časově omezené free hry ze Steamu (ne F2P)
+    # ═══ STEAM (limited-time free games via Reddit) ═══
     try:
-        from bs4 import BeautifulSoup
-        
-        url = "https://steamdb.info/upcoming/free/"
-        headers = {"User-Agent": "Mozilla/5.0"}
-        r = requests.get(url, timeout=6, headers=headers)
+        # Použij Reddit API (nepotřebuje autentizaci pro read-only)
+        reddit_url = "https://www.reddit.com/r/FreeGameFindings/new.json?limit=50"
+        headers = {"User-Agent": "Mozilla/5.0 (Discord Bot - Jesus Bot)"}
+        r = requests.get(reddit_url, timeout=10, headers=headers)
         
         if r.status_code == 200:
-            soup = BeautifulSoup(r.text, 'html.parser')
-            count = 0
+            data = r.json()
+            posts = data.get('data', {}).get('children', [])
             
-            for row in soup.select('tr'):
-                if count >= 10:
-                    break
+            steam_count = 0
+            for post in posts:
+                try:
+                    post_data = post.get('data', {})
+                    title = post_data.get('title', '')
+                    url = post_data.get('url', '')
+                    permalink = f"https://www.reddit.com{post_data.get('permalink', '')}"
+                    
+                    # Filtruj pouze Steam posty s [Steam] tagem
+                    if '[steam]' not in title.lower():
+                        continue
+                    
+                    # Přeskoč PSA, Question, Other tagy
+                    skip_tags = ['[psa]', '[question]', '[other]', '[expired]', '[ended]']
+                    if any(tag in title.lower() for tag in skip_tags):
+                        continue
+                    
+                    # Extrahuj název hry z titulu
+                    game_name = title
+                    
+                    # Odstraň tagy
+                    game_name = re.sub(r'\[.*?\]', '', game_name)
+                    game_name = re.sub(r'\(.*?\)', '', game_name)
+                    game_name = game_name.strip()
+                    
+                    # Pokud je název příliš dlouhý nebo prázdný, použij původní
+                    if not game_name or len(game_name) > 80:
+                        game_name = title[:80]
+                    
+                    # Zkus najít Steam store link v URL nebo v postu
+                    steam_url = url
+                    if 'steampowered.com' not in steam_url:
+                        steam_url = permalink
+                    
+                    # Zkontroluj duplikáty
+                    key = (game_name.lower(), steam_url)
+                    if key in seen:
+                        continue
+                    
+                    seen.add(key)
+                    
+                    # Zkus získat obrázek z Reddit preview
+                    image = ""
+                    preview = post_data.get('preview', {})
+                    if preview:
+                        images = preview.get('images', [])
+                        if images and len(images) > 0:
+                            source = images[0].get('source', {})
+                            image = source.get('url', '')
+                            image = html_unescape(image) if image else ""
+                    
+                    # Pokud není preview, zkus thumbnail
+                    if not image:
+                        thumbnail = post_data.get('thumbnail', '')
+                        if thumbnail and thumbnail.startswith('http'):
+                            image = thumbnail
+                    
+                    # Získej čas vytvoření
+                    created_utc = post_data.get('created_utc', 0)
+                    if created_utc:
+                        created_date = datetime.datetime.fromtimestamp(created_utc)
+                        time_ago = datetime.datetime.now() - created_date
+                        
+                        if time_ago.days > 0:
+                            expire_str = f"Posted {time_ago.days}d ago"
+                        elif time_ago.seconds >= 3600:
+                            expire_str = f"Posted {time_ago.seconds // 3600}h ago"
+                        else:
+                            expire_str = f"Posted {time_ago.seconds // 60}m ago"
+                    else:
+                        expire_str = "Check post"
+                    
+                    # Získej upvotes
+                    score = post_data.get('score', 0)
+                    num_comments = post_data.get('num_comments', 0)
+                    reviews = f"👍 {score} | 💬 {num_comments}"
+                    
+                    games.append({
+                        "title": game_name,
+                        "url": steam_url,
+                        "source": "Steam (Reddit)",
+                        "image": image,
+                        "original_price": "Zdarma",
+                        "expire_date": expire_str,
+                        "reviews": reviews,
+                        "platforms": "PC"
+                    })
+                    source_status["steam"] = True
+                    steam_count += 1
+                    
+                    # Limit na 5 Steam giveaways
+                    if steam_count >= 5:
+                        break
                 
-                # Najdi hry s "Keep Forever" nebo "Limited Time"
-                if 'Keep Forever' in row.text or 'ends in' in row.text.lower():
-                    app_link = row.select_one('a[href*="/app/"]')
-                    if app_link:
-                        try:
-                            app_id = app_link['href'].split('/app/')[1].split('/')[0]
-                            title = app_link.text.strip()
-                            title = html_unescape(title)
-                            
-                            # Získej detaily ze Steam Store API
-                            try:
-                                detail_url = f"https://store.steampowered.com/api/appdetails?appids={app_id}&cc=us"
-                                detail_r = requests.get(detail_url, timeout=3)
-                                detail_data = detail_r.json()
-                                
-                                if detail_data.get(app_id, {}).get("success"):
-                                    app_data = detail_data[app_id]["data"]
-                                    
-                                    # Získej původní cenu
-                                    original_price = "N/A"
-                                    if app_data.get("price_overview"):
-                                        original_price = f"${app_data['price_overview'].get('initial', 0) / 100:.2f}"
-                                    
-                                    # Získej datum vydání
-                                    release_date = app_data.get("release_date", {}).get("date", "TBA")
-                                    
-                                    # Získej hodnocení (metacritic nebo steam reviews)
-                                    reviews = "N/A"
-                                    if app_data.get("metacritic"):
-                                        reviews = f"Metacritic: {app_data['metacritic']['score']}/100"
-                                    
-                                    # Podporované platformy
-                                    platforms = []
-                                    if app_data.get("platforms", {}).get("windows"):
-                                        platforms.append("Windows")
-                                    if app_data.get("platforms", {}).get("mac"):
-                                        platforms.append("Mac")
-                                    if app_data.get("platforms", {}).get("linux"):
-                                        platforms.append("Linux")
-                                    
-                                    key = (title, f"https://store.steampowered.com/app/{app_id}")
-                                    if key not in seen:
-                                        seen.add(key)
-                                        games.append({
-                                            "title": title,
-                                            "url": f"https://store.steampowered.com/app/{app_id}",
-                                            "source": "Steam",
-                                            "image": f"https://shared.cloudflare.steamstatic.com/store_item_assets/steam/apps/{app_id}/header.jpg",
-                                            "original_price": original_price,
-                                            "release_date": release_date,
-                                            "reviews": reviews,
-                                            "platforms": ", ".join(platforms) if platforms else "N/A"
-                                        })
-                                        count += 1
-                                        source_status["steam"] = True
-                                else:
-                                    # Fallback bez detailů
-                                    key = (title, f"https://store.steampowered.com/app/{app_id}")
-                                    if key not in seen:
-                                        seen.add(key)
-                                        games.append({
-                                            "title": title,
-                                            "url": f"https://store.steampowered.com/app/{app_id}",
-                                            "source": "Steam",
-                                            "image": f"https://shared.cloudflare.steamstatic.com/store_item_assets/steam/apps/{app_id}/header.jpg",
-                                            "original_price": "N/A",
-                                            "release_date": "N/A",
-                                            "reviews": "N/A",
-                                            "platforms": "N/A"
-                                        })
-                                        count += 1
-                                        source_status["steam"] = True
-                            except Exception as detail_err:
-                                print(f"[steam] Error getting details for {app_id}: {detail_err}")
-                                # Fallback
-                                key = (title, f"https://store.steampowered.com/app/{app_id}")
-                                if key not in seen:
-                                    seen.add(key)
-                                    games.append({
-                                        "title": title,
-                                        "url": f"https://store.steampowered.com/app/{app_id}",
-                                        "source": "Steam",
-                                        "image": f"https://shared.cloudflare.steamstatic.com/store_item_assets/steam/apps/{app_id}/header.jpg",
-                                        "original_price": "N/A",
-                                        "release_date": "N/A",
-                                        "reviews": "N/A",
-                                        "platforms": "N/A"
-                                    })
-                                    count += 1
-                                    source_status["steam"] = True
-                        except Exception:
-                            continue
-            
-            if count > 0:
-                print(f"[freegames] Steam: Nalezeno {count} limited-time free her")
-            else:
-                print(f"[freegames] Steam: Zatim neni zadne limited-time free her")
-        else:
-            print(f"[freegames] Steam: SteamDB nedostupny (HTTP {r.status_code})")
+                except Exception:
+                    continue
+    
     except Exception as e:
-        print(f"[freegames] Steam error: {e}")
+        source_status["steam"] = False
 
     # ═══ PLAYSTATION PLUS ═══
     try:
@@ -953,14 +1016,24 @@ def get_free_games():
                     key = (title, link)
                     if key not in seen and count < 8:
                         seen.add(key)
+                        pubdate_el = item.find('pubDate')
+                        release_date = "Monthly Update"
+                        if pubdate_el is not None and pubdate_el.text:
+                            try:
+                                import email.utils
+                                parsed_date = email.utils.parsedate_to_datetime(pubdate_el.text)
+                                release_date = parsed_date.strftime("%d. %B %Y")
+                            except:
+                                release_date = "Monthly Update"
+                        
                         games.append({
                             "title": title,
                             "url": link,
                             "source": "PlayStation Plus",
-                            "image": image,  # ✅ obrázek z články (bez loga)
-                            "original_price": "N/A",
-                            "release_date": "Monthly",
-                            "reviews": "N/A",
+                            "image": image,
+                            "original_price": "Zdarma",
+                            "expire_date": release_date,
+                            "reviews": "PS Plus (Included)",
                             "platforms": "PlayStation"
                         })
                         source_status["playstation"] = True
@@ -1810,25 +1883,31 @@ async def freegames_command(interaction: discord.Interaction):
                 
                 # Vytvoř embed s hezčím rozložením
                 embed = discord.Embed(
-                    title=source,
+                    title=f"{get_platform_icon(source)} {source}",
                     url=url,
                     color=color,
                     description=title
                 )
                 
+                # Přidej logo platformy
+                logo_url = get_platform_logo_url(source)
+                if logo_url:
+                    embed.set_thumbnail(url=logo_url)
+                
                 # Cena a Datum vydání vedle sebe
-                price_text = f"~~{original_price}~~ **ZDARMA**" if (original_price and original_price != "N/A") else "**ZDARMA**"
-                embed.add_field(name="Price:", value=price_text, inline=True)
+                price_text = format_price_display(original_price)
+                embed.add_field(name="💰 Price:", value=price_text, inline=True)
                 
-                if release_date and release_date != "N/A":
-                    embed.add_field(name="Release Date:", value=release_date, inline=True)
+                if release_date and release_date != "N/A" and release_date != "TBA":
+                    embed.add_field(name="📅 Release Date:", value=release_date, inline=True)
                 
-                # Hodnocení a Free Until vedle sebe
-                if reviews and reviews != "N/A":
-                    embed.add_field(name="All Reviews:", value=reviews, inline=True)
-                
+                # Free Until
                 if expire_date:
                     embed.add_field(name="⏰ Free Until:", value=expire_date, inline=True)
+                
+                # Hodnocení pouze pro Epic Games a PS Plus, ne pro Steam
+                if reviews and reviews != "N/A" and "reddit" not in source.lower():
+                    embed.add_field(name="All Reviews:", value=reviews, inline=True)
                 
                 # Obrázek dolů (full-width)
                 if image:
@@ -1869,10 +1948,21 @@ async def freegames_command(interaction: discord.Interaction):
                 if featured_image:
                     embed.set_image(url=featured_image)
                 
-                embed.add_field(name="💰 Cena", value="**ZDARMA** (pro členy PS+)", inline=False)
-                embed.add_field(name="📅 Katalog", value="Měsíční aktualizace", inline=False)
-                embed.add_field(name="💻 Platformy", value="PlayStation", inline=False)
-                embed.set_footer(text=f"Celkem {len(psn_articles)} článků • Klikni na název pro otevření")
+                # Vezmi data z prvního článku (všechny mají stejné)
+                first_article = psn_articles[0] if psn_articles else {}
+                original_price = first_article.get("original_price", "FREE")
+                release_date = first_article.get("release_date", "Monthly Update")
+                
+                # Stejné pole jako u ostatních her
+                price_text = format_price_display(original_price)
+                embed.add_field(name="💰 Price:", value=price_text, inline=True)
+                
+                if release_date and release_date != "N/A":
+                    embed.add_field(name="📅 Release Date:", value=release_date, inline=True)
+                
+                embed.add_field(name="👥 Status:", value="For PS+ members", inline=True)
+                embed.add_field(name="💻 Platforms:", value="PlayStation", inline=True)
+                embed.set_footer(text=f"{len(psn_articles)} items • Click titles to view")
                 
                 await interaction.followup.send(embed=embed)
                 sent += 1
@@ -2177,25 +2267,31 @@ async def send_free_games():
                         
                         # Vytvoř embed s hezčím rozložením
                         embed = discord.Embed(
-                            title=source,
+                            title=f"{get_platform_icon(source)} {source}",
                             url=url,
                             color=color,
                             description=title
                         )
                         
+                        # Přidej logo platformy
+                        logo_url = get_platform_logo_url(source)
+                        if logo_url:
+                            embed.set_thumbnail(url=logo_url)
+                        
                         # Cena a Datum vydání vedle sebe
-                        price_text = f"~~{original_price}~~ **ZDARMA**" if (original_price and original_price != "N/A") else "**ZDARMA**"
-                        embed.add_field(name="Price:", value=price_text, inline=True)
+                        price_text = format_price_display(original_price)
+                        embed.add_field(name="💰 Price:", value=price_text, inline=True)
                         
-                        if release_date and release_date != "N/A":
-                            embed.add_field(name="Release Date:", value=release_date, inline=True)
+                        if release_date and release_date != "N/A" and release_date != "TBA":
+                            embed.add_field(name="📅 Release Date:", value=release_date, inline=True)
                         
-                        # Hodnocení a Free Until vedle sebe
-                        if reviews and reviews != "N/A":
-                            embed.add_field(name="All Reviews:", value=reviews, inline=True)
-                        
+                        # Free Until
                         if expire_date:
                             embed.add_field(name="⏰ Free Until:", value=expire_date, inline=True)
+                        
+                        # Hodnocení pouze pro Epic Games a PS Plus, ne pro Steam
+                        if reviews and reviews != "N/A" and "reddit" not in source.lower():
+                            embed.add_field(name="All Reviews:", value=reviews, inline=True)
                         
                         # Obrázek dolů (full-width)
                         if image:
@@ -2236,10 +2332,21 @@ async def send_free_games():
                         if featured_image:
                             embed.set_image(url=featured_image)
                         
-                        embed.add_field(name="💰 Cena", value="**ZDARMA** (pro členy PS+)", inline=False)
-                        embed.add_field(name="📅 Katalog", value="Měsíční aktualizace", inline=False)
-                        embed.add_field(name="💻 Platformy", value="PlayStation", inline=False)
-                        embed.set_footer(text=f"Celkem {len(psn_articles)} článků • Klikni na název pro otevření")
+                        # Vezmi data z prvního článku
+                        first_article = psn_articles[0] if psn_articles else {}
+                        ps_original_price = first_article.get("original_price", "FREE")
+                        ps_release_date = first_article.get("release_date", "Monthly Update")
+                        
+                        # Stejné pole jako u ostatních her
+                        ps_price_text = format_price_display(ps_original_price)
+                        embed.add_field(name="💰 Price:", value=ps_price_text, inline=True)
+                        
+                        if ps_release_date and ps_release_date != "N/A":
+                            embed.add_field(name="📅 Release Date:", value=ps_release_date, inline=True)
+                        
+                        embed.add_field(name="👥 Status:", value="For PS+ members", inline=True)
+                        embed.add_field(name="💻 Platforms:", value="PlayStation", inline=True)
+                        embed.set_footer(text=f"{len(psn_articles)} items • Click titles to view")
                         
                         await channel.send(embed=embed)
                         sent += 1

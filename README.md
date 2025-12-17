@@ -1,6 +1,6 @@
 # ✝️ Ježíš Discord Bot – hudba, verše a hry zdarma 🙏
 
-**Verze:** v2.6.5 – Free Games (Epic, Steam, PlayStation) | **Platform:** Raspberry Pi Ready
+**Verze:** v2.6.6 – Free Games (Epic, Steam Reddit, PlayStation) | **Platform:** Raspberry Pi Ready
 
 Discord bot napsaný v Pythonu (discord.py), který umí:
 
@@ -9,6 +9,7 @@ Discord bot napsaný v Pythonu (discord.py), který umí:
 * 🙏 Žehnat hráčům při spuštění her a reagovat na společné hrání ve voice
 * 🎁 Kadý večer publikovat „Hry zdarma” z Epic, Steam, PlayStation Plus s **individuálními embedy, obrázky**
 * 🔘 NOVÉ v2.6.5: Jednotný design embeda – `/freegames` = automatické posílání, PS+ články v jednom embedu
+* 🎮 NOVÉ v2.6.6: Steam Limited-Time Giveaways přes Reddit API `/r/FreeGameFindings`
 * ⚙️ Konfigurovat kanály per-guild s `/setchannel` a `/config`
 * 🎮 Minihry s XP systémem (kviz, veršový duel, RNG požehnání)
 * ✨ XP odměny za hudbu a hlasovou aktivitu s anti-cheat ochranou

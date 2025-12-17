@@ -1,4 +1,4 @@
-# 🎁 Hry Zdarma – Dokumentace (v2.6.5)
+# 🎁 Hry Zdarma – Dokumentace (v2.6.6)
 
 Kompletní guide na systém bezplatných her v Ježíši Discord Botu.
 
@@ -25,6 +25,11 @@ Bot automaticky sbírá bezplatné hry ze **3 spolehlivých platforem** a odesí
 - 📅 **Release Date** – Datum vydání **vedle Price**
 - ⭐ **Reviews** – Hodnocení **vedle Free Until**
 - ⏰ **Free Until** – Kdy skončí bezplatná dostupnost **vedle Reviews**
+
+### Nové v2.6.6
+- 🎮 **Steam Reddit Giveaways** – Limitované giveaways z `/r/FreeGameFindings` s engagementem
+- 🔍 **Filtrované Reviews** – Skryto u Steam Reddit (relevantní jen pro Epic % slevy)
+- 📡 **Veřejné Reddit API** – Bez autentifikace, žádné API tokeny potřeba
 
 ### Nové v2.6.5
 - ✨ **Jednotný design** – `/freegames` příkaz = automatické odesílání (20:10 CET)
@@ -60,7 +65,27 @@ Bot automaticky sbírá bezplatné hry ze **3 spolehlivých platforem** a odesí
 https://shared.cloudflare.steamstatic.com/store_item_assets/steam/apps/{APP_ID}/header.jpg
 ```
 
-### 🎯 PlayStation Plus ✅
+### � Steam Limited-Time Giveaways ✅ **(NOVÉ v2.6.6)**
+- **Zdroj:** `https://www.reddit.com/r/FreeGameFindings/new.json?limit=50` (Reddit veřejné API)
+- **Typ:** Reddit JSON API (bez autentifikace)
+- **Frekvence:** Real-time (všech 4 hodinách se spouští bot)
+- **Data:** Title, giveaway URL, engagement (upvotes + comments), čas příspěvku
+- **Filtr:** Pouze `[Steam]` tag, vynechání `[psa]`, `[question]`, `[other]`, `[expired]`, `[ended]`
+- **Limit:** Maximum 5 giveaways per spuštění (anti-spam)
+- **Příklady:** "Free: Company of Heroes 3", "[Steam] Control free until Wed"
+- **Status:** ✅ Pracující (2-5 giveaways obvykle)
+
+**Engagement Metrika:**
+```
+👍 {upvotes} | 💬 {comments}
+```
+
+**Časový Formát:**
+```
+Posted 2d ago, Posted 3h ago, Posted 15m ago
+```
+
+### �🎯 PlayStation Plus ✅
 - **URL:** `https://blog.playstation.com/tag/playstation-plus/feed/`
 - **Typ:** RSS feed
 - **Frekvence:** Měsíčně (obvykle 1. den měsíce)
