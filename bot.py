@@ -843,11 +843,8 @@ def get_free_games():
                                         offers = promo_offers[0].get("promotionalOffers", [])
                                         if offers and len(offers) > 0:
                                             discount = offers[0].get("discountSetting", {}).get("discountPercentage")
-                                            if discount is not None:
-                                                if discount == 0:
-                                                    reviews = "100% sleva"
-                                                else:
-                                                    reviews = f"{discount}% sleva"
+                                            # Discount procento se již nezobrazuje v Reviews poli
+                                            reviews = ""
                                 
                                 # POZNÁMKA: Tahej původní cenu z fmtPrice
                                 # OMEZENÍ: Pro free games vrací API všechny ceny jako 0
@@ -1889,10 +1886,10 @@ async def freegames_command(interaction: discord.Interaction):
                     description=title
                 )
                 
-                # Přidej logo platformy
+                # Přidej logo platformy do headeru
                 logo_url = get_platform_logo_url(source)
                 if logo_url:
-                    embed.set_thumbnail(url=logo_url)
+                    embed.set_author(name=source, icon_url=logo_url)
                 
                 # Cena a Datum vydání vedle sebe
                 price_text = format_price_display(original_price)
@@ -2273,10 +2270,10 @@ async def send_free_games():
                             description=title
                         )
                         
-                        # Přidej logo platformy
+                        # Přidej logo platformy do headeru
                         logo_url = get_platform_logo_url(source)
                         if logo_url:
-                            embed.set_thumbnail(url=logo_url)
+                            embed.set_author(name=source, icon_url=logo_url)
                         
                         # Cena a Datum vydání vedle sebe
                         price_text = format_price_display(original_price)
