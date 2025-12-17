@@ -734,17 +734,17 @@ def get_platform_icon(source: str) -> str:
     return "🎮"  # Jeden ovladač pro všechny platformy
 
 def get_platform_logo_url(source: str) -> str:
-    """Vrací URL na logo platformy pro embed thumbnail"""
+    """Vrací URL na logo platformy pro embed thumbnail (transparentní PNG)"""
     source_lower = source.lower()
     if "epic" in source_lower:
-        # Epic Games - oficiální logo (verified working)
-        return "https://cdn2.unrealengine.com/Epic+Games+Node%2Fxlarge_whitetext_blackback_epiclogo_504x512_1529964470588-503x512-ac795e81c54b27aaa2e196456dd307bfe4ca3ca4.jpg"
+        # Epic Games - transparentní PNG logo
+        return "https://i.imgur.com/yKGWkot.png"
     elif "steam" in source_lower:
-        # Steam - oficiální logo (verified working)
-        return "https://store.cloudflare.steamstatic.com/public/shared/images/header/logo_steam.svg"
+        # Steam - transparentní PNG logo
+        return "https://i.imgur.com/EnXyVnT.png"
     elif "playstation" in source_lower or "psn" in source_lower or "ps+" in source_lower:
-        # PlayStation - oficiální logo (verified working)
-        return "https://gmedia.playstation.com/is/image/SIEPDC/playstation-logo-01-en-25jul22?$facebook$"
+        # PlayStation - transparentní PNG logo
+        return "https://i.imgur.com/6rVGC5d.png"
     else:
         return ""
 
