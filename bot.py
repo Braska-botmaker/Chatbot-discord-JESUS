@@ -734,17 +734,17 @@ def get_platform_icon(source: str) -> str:
     return "🎮"  # Jeden ovladač pro všechny platformy
 
 def get_platform_logo_url(source: str) -> str:
-    """Vrací URL na logo platformy pro embed thumbnail (transparentní PNG)"""
+    """Vrací URL na logo platformy pro embed thumbnail"""
     source_lower = source.lower()
     if "epic" in source_lower:
-        # Epic Games - transparentní PNG logo
-        return "https://i.imgur.com/yKGWkot.png"
+        # Epic Games logo - veřejný CDN
+        return "https://cdn2.unrealengine.com/egs-site-favicon-32x32-1a2e4eb01ff7.ico"
     elif "steam" in source_lower:
-        # Steam - transparentní PNG logo
-        return "https://i.imgur.com/EnXyVnT.png"
+        # Steam logo - veřejný CDN
+        return "https://store.akamai.steamstatic.com/public/images/favicons/favicon-32x32.png"
     elif "playstation" in source_lower or "psn" in source_lower or "ps+" in source_lower:
-        # PlayStation - transparentní PNG logo
-        return "https://i.imgur.com/6rVGC5d.png"
+        # PlayStation logo - veřejný CDN
+        return "https://www.playstation.com/content/dam/corporate/images/logos/playstation-logo-icon.png"
     else:
         return ""
 
@@ -826,9 +826,9 @@ def get_free_games():
                                         end_date = offers[0].get("endDate")
                                         if end_date:
                                             # Převeď ISO format na čitelnější
-                                            from datetime import datetime
+                                            from datetime import datetime as dt_class
                                             try:
-                                                dt = datetime.fromisoformat(end_date.replace('Z', '+00:00'))
+                                                dt = dt_class.fromisoformat(end_date.replace('Z', '+00:00'))
                                                 expire_date = dt.strftime("%d.%m.%Y %H:%M")
                                             except:
                                                 expire_date = end_date
@@ -1002,6 +1002,11 @@ def get_free_games():
         print(f"[freegames] Steam (Reddit) error: {e}")
         source_status["steam"] = False
 
+    print(f"\n[DEBUG] After STEAM: total games = {len(games)}, steam_status = {source_status['steam']}")
+    print(f"[DEBUG] Games list:")
+    for i, g in enumerate(games):
+        print(f"  {i+1}. {g.get('source', 'N/A')}: {g.get('title', 'N/A')}")
+    
     # ═══ PLAYSTATION PLUS ═══
     try:
         ps_feed = "https://blog.playstation.com/tag/playstation-plus/feed/"
@@ -1866,7 +1871,11 @@ async def freegames_command(interaction: discord.Interaction):
         regular_games = [g for g in free_games if "playstation" not in g.get("source", "").lower()]
         psn_articles = [g for g in free_games if "playstation" in g.get("source", "").lower()]
         
-        print(f"[freegames] Regular games: {len(regular_games)}, PSN articles: {len(psn_articles)}")
+        print(f"\n[DEBUG COMMAND] Regular games: {len(regular_games)}, PSN articles: {len(psn_articles)}")
+        print(f"[DEBUG COMMAND] Regular games sources:")
+        for i, g in enumerate(regular_games):
+            print(f"  {i+1}. {g.get('source', 'N/A')}: {g.get('title', 'N/A')}")
+        
         for i, g in enumerate(regular_games[:5]):
             print(f"  Game {i+1}: {g.get('title', 'N/A')} from {g.get('source', 'N/A')}")
         
@@ -1901,9 +1910,9 @@ async def freegames_command(interaction: discord.Interaction):
                     color = discord.Color.purple()
                     logo = "🎁"
                 
-                # Vytvoř embed s hezčím rozložením
+                # Vytvoř embed s emoji logem v titulu
                 embed = discord.Embed(
-                    title=title,
+                    title=f"{logo} {title}",
                     url=url,
                     color=color,
                     description=source
@@ -1911,11 +1920,13 @@ async def freegames_command(interaction: discord.Interaction):
                 
                 # Přidej logo platformy jako thumbnail (vpravo nahoře)
                 logo_url = get_platform_logo_url(source)
+                print(f"[freegames] Logo for {source}: {logo_url}")
                 if logo_url and isinstance(logo_url, str) and len(logo_url) > 10 and logo_url.startswith("http"):
                     try:
                         embed.set_thumbnail(url=logo_url)
+                        print(f"[freegames] ✅ Logo set for {source}")
                     except Exception as e:
-                        print(f"[freegames] Logo URL error for {source}: {e}")
+                        print(f"[freegames] ❌ Logo URL error for {source}: {e}")
                 
                 # Cena a Datum vydání vedle sebe
                 price_text = format_price_display(original_price)
@@ -2288,9 +2299,9 @@ async def send_free_games():
                             color = discord.Color.purple()
                             logo = "🎁"
                         
-                        # Vytvoř embed s hezčím rozložením
+                        # Vytvoř embed s emoji logem v titulu
                         embed = discord.Embed(
-                            title=title,
+                            title=f"{logo} {title}",
                             url=url,
                             color=color,
                             description=source
