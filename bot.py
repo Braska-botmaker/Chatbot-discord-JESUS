@@ -879,11 +879,15 @@ def get_free_games():
         print(f"[freegames] Epic error: {e}")
 
     # ═══ STEAM (limited-time free games via Reddit) ═══
+    print("[freegames] Starting STEAM section...")
     try:
         # Použij Reddit API (nepotřebuje autentizaci pro read-only)
         reddit_url = "https://www.reddit.com/r/FreeGameFindings/new.json?limit=50"
         headers = {"User-Agent": "Mozilla/5.0 (Discord Bot - Jesus Bot)"}
+        print(f"[freegames] STEAM: Connecting to {reddit_url}")
         r = requests.get(reddit_url, timeout=10, headers=headers)
+        
+        print(f"[freegames] Reddit HTTP {r.status_code}")
         
         if r.status_code == 200:
             data = r.json()
@@ -983,10 +987,19 @@ def get_free_games():
                     if steam_count >= 5:
                         break
                 
-                except Exception:
+                except Exception as post_error:
+                    print(f"[freegames] Error parsing Reddit post: {post_error}")
                     continue
-    
+            
+            print(f"[freegames] Found {steam_count} Steam giveaways from Reddit")
+            if steam_count > 0:
+                source_status["steam"] = True
+        
+        else:
+            print(f"[freegames] Reddit HTTP {r.status_code}")
+
     except Exception as e:
+        print(f"[freegames] Steam (Reddit) error: {e}")
         source_status["steam"] = False
 
     # ═══ PLAYSTATION PLUS ═══
@@ -1842,6 +1855,9 @@ async def freegames_command(interaction: discord.Interaction):
     try:
         free_games, source_status = get_free_games()
         
+        print(f"[freegames] Obtained {len(free_games)} total games")
+        print(f"[freegames] Source status: {source_status}")
+        
         if not free_games:
             await interaction.followup.send("❌ Žádné zdarma hry nenalezeny")
             return
@@ -1849,6 +1865,10 @@ async def freegames_command(interaction: discord.Interaction):
         # Oddělení her od PSN článků
         regular_games = [g for g in free_games if "playstation" not in g.get("source", "").lower()]
         psn_articles = [g for g in free_games if "playstation" in g.get("source", "").lower()]
+        
+        print(f"[freegames] Regular games: {len(regular_games)}, PSN articles: {len(psn_articles)}")
+        for i, g in enumerate(regular_games[:5]):
+            print(f"  Game {i+1}: {g.get('title', 'N/A')} from {g.get('source', 'N/A')}")
         
         # Pošli max 10 her (aby to nebyl spam)
         sent = 0
