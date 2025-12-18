@@ -1,6 +1,6 @@
 # ✝️ Ježíš Discord Bot – hudba, verše a hry zdarma 🙏
 
-**Verze:** v2.6.6 – Free Games (Epic, Steam Reddit, PlayStation) | **Platform:** Raspberry Pi Ready
+**Verze:** v2.6.7 – Free Games (Epic, Steam Reddit, PlayStation) | **Platform:** Raspberry Pi Ready
 
 Discord bot napsaný v Pythonu (discord.py), který umí:
 

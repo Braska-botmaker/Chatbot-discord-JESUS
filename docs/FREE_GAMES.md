@@ -1,4 +1,4 @@
-# 🎁 Hry Zdarma – Dokumentace (v2.6.6)
+# 🎁 Hry Zdarma – Dokumentace (v2.6.7)
 
 Kompletní guide na systém bezplatných her v Ježíši Discord Botu.
 

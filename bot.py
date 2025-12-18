@@ -1,5 +1,5 @@
 # ╔════════════════════════════════════════════════════════════════════════════╗
-# ║      Ježíš Discord Bot v2.6.6 – Free Games (Epic, Steam, PlayStation)      ║
+# ║      Ježíš Discord Bot v2.6.7 – Free Games (Epic, Steam, PlayStation)      ║
 # ║                     Kompletní přepis na slash commands                     ║
 # ╚════════════════════════════════════════════════════════════════════════════╝
 
@@ -1935,9 +1935,9 @@ async def freegames_command(interaction: discord.Interaction):
                 if release_date and release_date != "N/A" and release_date != "TBA":
                     embed.add_field(name="📅 Release Date:", value=release_date, inline=True)
                 
-                # Free Until
+                # Posted info
                 if expire_date:
-                    embed.add_field(name="⏰ Free Until:", value=expire_date, inline=True)
+                    embed.add_field(name="⏰ Posted:", value=expire_date, inline=True)
                 
                 # Hodnocení pouze pro Epic Games a PS Plus, ne pro Steam
                 if reviews and reviews != "N/A" and "reddit" not in source.lower():
@@ -2322,9 +2322,9 @@ async def send_free_games():
                         if release_date and release_date != "N/A" and release_date != "TBA":
                             embed.add_field(name="📅 Release Date:", value=release_date, inline=True)
                         
-                        # Free Until
+                        # Posted info
                         if expire_date:
-                            embed.add_field(name="⏰ Free Until:", value=expire_date, inline=True)
+                            embed.add_field(name="⏰ Posted:", value=expire_date, inline=True)
                         
                         # Hodnocení pouze pro Epic Games a PS Plus, ne pro Steam
                         if reviews and reviews != "N/A" and "reddit" not in source.lower():

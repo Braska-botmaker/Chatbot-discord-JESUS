@@ -4,6 +4,34 @@ Všechny změny v tomto projektu jsou zaznamenány v tomto souboru.
 
 ---
 
+## [v2.6.7] – 2025-12-18
+
+### 🔧 Bugfixy & Optimalizace
+
+#### Oprava datetime importu v Epic Games sekci 🐛
+- **Problém:** `from datetime import datetime` v Epic Games sekci přepsal globální `datetime` modul
+- **Vliv:** Způsoboval `TypeError: type object 'datetime.datetime' has no attribute...` v STEAM sekci
+- **Řešení:** Změněno na `from datetime import datetime as dt_class`
+- **Výsledek:** Steam Reddit hry se nyní správně parsují a posílají
+
+#### Zlepšení popisků polí u Steam her 📝
+- **Změna:** `⏰ Free Until:` → `⏰ Posted:` (specificko pro Steam Reddit, kde máme "Posted Xd/Xh/Xm ago")
+- **Logika:** Podmíněné zobrazování dle zdroje: Steam = "Posted", ostatní = "Free Until"
+- **Aplikace:** Obě místa - `/freegames` command a `send_free_games()` task (20:10 CET)
+
+#### Vylepšení logo URL adres 🎯
+- **Starý problém:** Imgur links byly zablokované/neplatné
+- **Řešení:** Nahrazeny oficiálními CDN URL z epicgames.com, steampowered.com, playstation.com
+- **Fallback:** Emoji loga v titulu (🟣 Epic, 🎮 Steam, atd.) - vždy viditelná
+
+### ✨ Vylepšení UX
+
+- Debug output v logu pro lepší diagnostiku STEAM sekce
+- Čitelnější chybové zprávy při parsování Reddit postů
+- Lepší viditelnost emoji log v embedu titulu
+
+---
+
 ## [v2.6.6] – 2025-01-23
 
 ### ✨ Nové funkce
