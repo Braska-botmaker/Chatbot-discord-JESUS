@@ -1384,18 +1384,17 @@ async def serverstats_command(interaction: discord.Interaction):
         await interaction.followup.send(f"❌ Chyba: {str(e)[:100]}")
         print(f"[serverstats] Error: {e}")
 
-@bot.tree.command(name="leaderboard", description="Leaderboard hráčů podle XP a aktivit")
+@bot.tree.command(name="leaderboard", description="Leaderboard hráčů podle XP a hodin")
 async def leaderboard_command(interaction: discord.Interaction):
-    """Top 10 hráčů podle XP s hodinami (v2.7.1)."""
+    """Dva leaderboards - XP a hodin (v2.7.1)."""
     try:
         await interaction.response.defer()
         guild = interaction.guild
         
-        # Seřaď hráče podle XP
+        # ============ LEADERBOARD 1: PODLE XP ============
         sorted_xp = sorted(user_xp.items(), key=lambda x: x[1].get("xp", 0), reverse=True)[:10]
         
-        # Build embed
-        embed = discord.Embed(
+        embed_xp = discord.Embed(
             title="🏆 **Leaderboard – Top 10 podle XP**",
             color=discord.Color.gold()
         )
@@ -1415,19 +1414,54 @@ async def leaderboard_command(interaction: discord.Interaction):
             streak_data = verse_streak.get(user_id, {})
             streak = streak_data.get("count", 0)
             
-            # Přidej game activity (hodin)
-            game_data = game_activity.get(user_id, {"games": {}})
-            total_hours = sum(hours for hours in game_data.get("games", {}).values() if hours > 0)
-            
-            xp_str += f"{idx}. **{username}**\n   ⭐ {xp}XP ({level}) | 🔥 Streak: {streak} | 🎮 {total_hours:.1f}h\n"
+            xp_str += f"{idx}. **{username}**\n   ⭐ {xp}XP ({level}) | 🔥 Streak: {streak}\n"
         
         if xp_str:
-            embed.add_field(name="🏆 Top 10 Hráči", value=xp_str, inline=False)
+            embed_xp.add_field(name="XP Rebrikář", value=xp_str, inline=False)
         else:
-            embed.add_field(name="🏆 Top 10 Hráči", value="Zatím žádní hráči", inline=False)
+            embed_xp.add_field(name="XP Rebrikář", value="Zatím žádní hráči", inline=False)
         
-        embed.set_footer(text="v2.7.1 Leaderboard | Jesus Bot")
-        await interaction.followup.send(embed=embed)
+        embed_xp.set_footer(text="v2.7.1 Leaderboard | Jesus Bot")
+        
+        # ============ LEADERBOARD 2: PODLE HODIN ============
+        # Seřaď hráče podle celkových hodin
+        hours_data = {}
+        for user_id, game_data in game_activity.items():
+            total_hours = sum(hours for hours in game_data.get("games", {}).values() if hours > 0)
+            if total_hours > 0:
+                hours_data[user_id] = total_hours
+        
+        sorted_hours = sorted(hours_data.items(), key=lambda x: x[1], reverse=True)[:10]
+        
+        embed_hours = discord.Embed(
+            title="⏰ **Leaderboard – Top 10 podle Hodin**",
+            color=discord.Color.blurple()
+        )
+        
+        hours_str = ""
+        for idx, (user_id, total_hours) in enumerate(sorted_hours, 1):
+            try:
+                user = await bot.fetch_user(user_id)
+                username = user.name
+            except:
+                username = f"User {user_id}"
+            
+            # Počet her
+            game_data = game_activity.get(user_id, {"games": {}})
+            num_games = len(game_data.get("games", {}))
+            
+            hours_str += f"{idx}. **{username}**\n   🎮 {total_hours:.1f}h ({num_games} her)\n"
+        
+        if hours_str:
+            embed_hours.add_field(name="Časový Rebrikář", value=hours_str, inline=False)
+        else:
+            embed_hours.add_field(name="Časový Rebrikář", value="Zatím žádná data", inline=False)
+        
+        embed_hours.set_footer(text="v2.7.1 Leaderboard | Jesus Bot")
+        
+        # Pošli oba embedy
+        await interaction.followup.send(embed=embed_xp)
+        await interaction.followup.send(embed=embed_hours)
         
     except Exception as e:
         await interaction.followup.send(f"❌ Chyba: {str(e)[:100]}")
