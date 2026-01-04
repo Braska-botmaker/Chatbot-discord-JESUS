@@ -1,4 +1,4 @@
-# ⚡ QUICK START – Upgrade na v2.0
+# ⚡ QUICK START – v2.7 Server Analytics & Summary
 
 ## Pokud už máš bota spuštěného
 
@@ -40,12 +40,14 @@ Zkontroluj že funguje:
 
 ---
 
-## Nové features v v2.0
+## Nové features v v2.7
 
-✅ **Automatický reconnect** – Bot se sám pokusí znovu připojit, když se voice ztratí  
-✅ **Robustní timeout handling** – Žádné víc "TimeoutError", jen automatický retry  
-✅ **Lepší YouTube streaming** – Správné HTTP headers, vyšší bitrate  
-✅ **Watchdog system** –监視bot během přehrávání, automaticky reconnectuje  
+✅ **Server Analytics** – `/serverstats` pro přehled aktivit na serveru  
+✅ **Leaderboards** – `/leaderboard` s top 10 hráči podle XP  
+✅ **Osobní profil** – `/myactivity` s tvou statistikou a dosaženími  
+✅ **Týdenní trend** – `/weeklysummary` s analýzou poslední týdne  
+✅ **Agregovaná data** – Sledování her, hudby, XP a verse streaku  
+✅ **Anti-cheat** – Ochrana proti falšování dat v analytics  
 
 ---
 

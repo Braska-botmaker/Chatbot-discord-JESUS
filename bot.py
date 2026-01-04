@@ -1,5 +1,5 @@
 # ╔════════════════════════════════════════════════════════════════════════════╗
-# ║      Ježíš Discord Bot v2.6.7 – Free Games (Epic, Steam, PlayStation)      ║
+# ║    Ježíš Discord Bot v2.7 – Server Analytics & Summary (Leaderboards)      ║
 # ║                     Kompletní přepis na slash commands                     ║
 # ╚════════════════════════════════════════════════════════════════════════════╝
 
@@ -1214,6 +1214,12 @@ game_blessings = {
     "Starfield": "Ať tvůj **vesmír** 🌌 není prázdnější než půlka galaxií, co jsi už viděl. **Discovery!**",
     "Forza Horizon 5": "Ať ti to **klouže** jen když chceš 🏎️, ne když to zrovna nejmíň potřebuješ. **Drift master!**",
     "Genshin Impact": "Ať jsou tvé **denní krystaly** 🔮 vždy plné a ať ti Pán zabrání farmiť **Artifacty** s těmi nejhoršími staty. 😇",
+    "Schedule I": "Ať ti **kontraband** projde pod nosem fízlů 🚔 a tvoje **impérium** roste. 💊",
+    "Geometry Dash": "Ať tvůj **click** sedne na milisekundu přesně 🔊 a ten poslední **triple spike** nezlomí nervy. 🔺",
+    "ARC Raiders": "Ať se ti **roboti** vyhýbají 🤖 a tvůj **loot** stojí za ten risk. **Scavenge or die!** 🛠️",
+    "The Forest": "Ať tvůj **barák na stromě** vydrží nájezdy mutantů 🌲 a ten malej **Timmy** tě jednou fakt najde. 🦴",
+    "Sons Of The Forest": "Ať ti **Kelvin** nekácí stromy na hlavu a **Virginia** ti kryje záda, když jde do tuhého. 🔫",
+    "Fortnite": "přeji nejvíce **Victory Royale!** 👑",
 }
 
 # ═══════════════════════════════════════════════════════════════════════════════
@@ -1296,6 +1302,257 @@ async def on_ready():
     update_bot_presence.start()
     clear_recent_announcements.start()
     track_game_activity_periodic.start()
+
+# ═══════════════════════════════════════════════════════════════════════════════
+#                10b. V2.7 – SERVER ANALYTICS & SUMMARY
+# ═══════════════════════════════════════════════════════════════════════════════
+
+@bot.tree.command(name="serverstats", description="Přehled aktivit, hudby, miniher na serveru")
+async def serverstats_command(interaction: discord.Interaction):
+    """Server-wide analytics – aktivita, hudba, minihry (v2.7)."""
+    try:
+        await interaction.response.defer()
+        guild = interaction.guild
+        
+        # Sbírání dat
+        total_users = guild.member_count
+        active_users = 0
+        total_xp = 0
+        music_count = 0
+        games_played = {}
+        
+        for user_id, xp_data in user_xp.items():
+            total_xp += xp_data.get("xp", 0)
+            if xp_data.get("xp", 0) > 0:
+                active_users += 1
+        
+        for user_id, game_data in game_activity.items():
+            games = game_data.get("games", {})
+            for game_name, hours in games.items():
+                if hours > 0:
+                    if game_name not in games_played:
+                        games_played[game_name] = 0
+                    games_played[game_name] += hours
+        
+        # Počet skladeb v běžích frontách
+        for queue in music_queues.values():
+            music_count += len(queue)
+        
+        # Top 5 her
+        top_games = sorted(games_played.items(), key=lambda x: x[1], reverse=True)[:5]
+        
+        # Build embed
+        embed = discord.Embed(
+            title="📊 **Server Analytics – v2.7**",
+            color=discord.Color.purple()
+        )
+        
+        embed.add_field(
+            name="👥 Uživatelé",
+            value=f"Celkem: **{total_users}**\nAktivní: **{active_users}**",
+            inline=True
+        )
+        
+        embed.add_field(
+            name="⭐ Experience",
+            value=f"Celkové XP: **{total_xp:,}**",
+            inline=True
+        )
+        
+        embed.add_field(
+            name="🎵 Hudba",
+            value=f"Skladeb v frontě: **{music_count}**",
+            inline=True
+        )
+        
+        if top_games:
+            top_str = "\n".join([f"🎮 **{game}**: {hours:.1f}h" for game, hours in top_games])
+            embed.add_field(name="🏆 Top hry", value=top_str, inline=False)
+        else:
+            embed.add_field(name="🏆 Top hry", value="Zatím žádné", inline=False)
+        
+        embed.set_footer(text="v2.7 Analytics | Jesus Bot")
+        await interaction.followup.send(embed=embed)
+        
+    except Exception as e:
+        await interaction.followup.send(f"❌ Chyba: {str(e)[:100]}")
+        print(f"[serverstats] Error: {e}")
+
+@bot.tree.command(name="leaderboard", description="Leaderboard hráčů podle XP a aktivit")
+async def leaderboard_command(interaction: discord.Interaction):
+    """Top 10 hráčů podle XP, her a verset streak (v2.7)."""
+    try:
+        await interaction.response.defer()
+        guild = interaction.guild
+        
+        # Seřaď hráče podle XP
+        sorted_xp = sorted(user_xp.items(), key=lambda x: x[1].get("xp", 0), reverse=True)[:10]
+        
+        # Build embed
+        embed = discord.Embed(
+            title="🏆 **Leaderboard – Top 10**",
+            description="Pořadí podle Experience Points (XP)",
+            color=discord.Color.gold()
+        )
+        
+        xp_str = ""
+        for idx, (user_id, xp_data) in enumerate(sorted_xp, 1):
+            try:
+                user = await bot.fetch_user(user_id)
+                username = user.name
+            except:
+                username = f"User {user_id}"
+            
+            xp = xp_data.get("xp", 0)
+            level = xp_data.get("level", "🟩 Věřící")
+            
+            # Přidej streak informaci
+            streak_data = verse_streak.get(user_id, {})
+            streak = streak_data.get("count", 0)
+            
+            xp_str += f"{idx}. **{username}** – {xp}XP ({level}) 🔥 Streak: {streak}\n"
+        
+        embed.description = xp_str or "Zatím žádní hráči"
+        embed.set_footer(text="v2.7 Leaderboard | Jesus Bot")
+        await interaction.followup.send(embed=embed)
+        
+    except Exception as e:
+        await interaction.followup.send(f"❌ Chyba: {str(e)[:100]}")
+        print(f"[leaderboard] Error: {e}")
+
+@bot.tree.command(name="myactivity", description="Tvoje osobní statistiky a dosažení")
+async def myactivity_command(interaction: discord.Interaction):
+    """Personal stats – XP, hry, verse streak, achievements (v2.7)."""
+    try:
+        await interaction.response.defer()
+        user_id = interaction.user.id
+        
+        # XP data
+        xp_data = user_xp.get(user_id, {"xp": 0, "level": "🟩 Věřící"})
+        
+        # Game activity
+        game_data = game_activity.get(user_id, {"games": {}, "last_update": datetime.datetime.now()})
+        top_games = sorted(game_data.get("games", {}).items(), key=lambda x: x[1], reverse=True)[:5]
+        
+        # Verse streak
+        streak_data = verse_streak.get(user_id, {"count": 0, "last_date": None})
+        
+        # Build embed
+        embed = discord.Embed(
+            title="📈 **Tvůj Profil – v2.7**",
+            description=f"Statistiky pro {interaction.user.mention}",
+            color=discord.Color.blue()
+        )
+        
+        embed.add_field(
+            name="⭐ Experience",
+            value=f"**{xp_data.get('xp', 0)}** XP\n{xp_data.get('level', '🟩 Věřící')}",
+            inline=True
+        )
+        
+        embed.add_field(
+            name="🔥 Verse Streak",
+            value=f"**{streak_data.get('count', 0)}** dní",
+            inline=True
+        )
+        
+        # Top hry
+        if top_games:
+            games_str = "\n".join([f"🎮 **{game}**: {hours:.1f}h" for game, hours in top_games])
+            embed.add_field(name="🎯 Top hry", value=games_str, inline=False)
+        else:
+            embed.add_field(name="🎯 Top hry", value="Zatím jsi nic nehrál(a)", inline=False)
+        
+        # Achievements
+        achievements = []
+        if xp_data.get('xp', 0) >= 100:
+            achievements.append("🌟 Veterán (100+ XP)")
+        if xp_data.get('xp', 0) >= 500:
+            achievements.append("👑 Mistr (500+ XP)")
+        if streak_data.get('count', 0) >= 7:
+            achievements.append("🔥 Věrný (7+ dnů streak)")
+        if len(top_games) >= 3:
+            achievements.append("🎮 Hráč (3+ her)")
+        
+        if achievements:
+            embed.add_field(name="🏅 Dosažení", value="\n".join(achievements), inline=False)
+        
+        embed.set_footer(text="v2.7 Profile | Jesus Bot")
+        await interaction.followup.send(embed=embed)
+        
+    except Exception as e:
+        await interaction.followup.send(f"❌ Chyba: {str(e)[:100]}")
+        print(f"[myactivity] Error: {e}")
+
+@bot.tree.command(name="weeklysummary", description="Týdenní shrnutí aktivit (TOP игроків, her, eventů)")
+async def weeklysummary_command(interaction: discord.Interaction):
+    """Weekly summary – top players, games, trends (v2.7)."""
+    try:
+        await interaction.response.defer()
+        
+        # Týdenní trend (poslední 7 dní)
+        now = datetime.datetime.now()
+        week_ago = now - datetime.timedelta(days=7)
+        
+        # Sbírá data z poslední týdne
+        weekly_users = {}
+        total_playtime = 0
+        
+        for user_id, game_data in game_activity.items():
+            last_update = game_data.get("last_update", now)
+            if isinstance(last_update, str):
+                try:
+                    last_update = datetime.datetime.fromisoformat(last_update)
+                except:
+                    last_update = now
+            
+            if last_update >= week_ago:
+                games = game_data.get("games", {})
+                playtime = sum(hours for hours in games.values() if hours > 0)
+                if playtime > 0:
+                    weekly_users[user_id] = playtime
+                    total_playtime += playtime
+        
+        # Top hráči týdne
+        top_weekly = sorted(weekly_users.items(), key=lambda x: x[1], reverse=True)[:5]
+        
+        # Build embed
+        embed = discord.Embed(
+            title="📅 **Týdenní Shrnutí – v2.7**",
+            description=f"Období: {(now - datetime.timedelta(days=7)).strftime('%d.%m')} – {now.strftime('%d.%m.%Y')}",
+            color=discord.Color.orange()
+        )
+        
+        embed.add_field(
+            name="⏱️ Celkový čas hrání",
+            value=f"**{total_playtime:.1f}** hodin",
+            inline=True
+        )
+        
+        embed.add_field(
+            name="👥 Aktivní hráči",
+            value=f"**{len(weekly_users)}** hráčů",
+            inline=True
+        )
+        
+        # Top hráči
+        if top_weekly:
+            top_str = ""
+            for idx, (user_id, playtime) in enumerate(top_weekly, 1):
+                try:
+                    user = await bot.fetch_user(user_id)
+                    username = user.name
+                except:
+                    username = f"User {user_id}"
+                top_str += f"{idx}. **{username}** – {playtime:.1f}h\n"
+            embed.add_field(name="🏆 Top hráči týdne", value=top_str, inline=False)
+        
+        embed.set_footer(text="v2.7 Weekly Summary | Jesus Bot")
+        await interaction.followup.send(embed=embed)
+        
+    except Exception as e:
+        await interaction.followup.send(f"❌ Chyba: {str(e)[:100]}")
+        print(f"[weeklysummary] Error: {e}")
 
 # ═══════════════════════════════════════════════════════════════════════════════
 #                11. SLASH COMMANDS – HUDBA / MUSIC
@@ -2035,64 +2292,212 @@ async def bless_command(interaction: discord.Interaction, user: discord.User = N
 async def version_command(interaction: discord.Interaction):
     """Show bot version and changelog."""
     try:
-        embed = discord.Embed(title="ℹ️ Jesus Discord Bot", color=discord.Color.gold())
-        embed.add_field(name="Version", value="v2.6.4 – Free Games (Epic, Steam, PlayStation)", inline=False)
-        embed.add_field(name="Current Features", value="""
-🎮 Multi-Platform Free Games (Epic Games, Steam, PlayStation Plus)
-⚙️ `/setchannel` – Configure channels per-guild
-📋 `/config` – Show server settings
-🎵 YouTube Playlist & Shuffle (v2.4.1)
+        embed = discord.Embed(
+            title="ℹ️ Ježíš Discord Bot – v2.7",
+            description="Server Analytics & Summary (Leaderboards)",
+            color=discord.Color.gold()
+        )
+        
+        embed.add_field(
+            name="⏱️ Version",
+            value="v2.7\nServer Analytics & Summary (Leaderboards)",
+            inline=True
+        )
+        
+        embed.add_field(
+            name="📅 Release",
+            value="2026-01-04",
+            inline=True
+        )
+        
+        embed.add_field(
+            name="🎵 Music Features",
+            value="""🎵 YouTube & Playlist support
 📊 Queue duration estimate
-🚫 Duplicate blocking + 1h blessing cooldown
-✅ Per-guild configuration
-✨ XP & Voice activity rewards (v2.6+)""", inline=False)
-        embed.add_field(name="GitHub", value="https://github.com/Braska-botmaker/Chatbot-discord-JESUS", inline=False)
+🚫 Duplicate blocking
+🔀 Shuffle support""",
+            inline=True
+        )
+        
+        embed.add_field(
+            name="🎮 Gaming & XP",
+            value="""⭐ XP system s levely
+🎯 Minihry (kviz, duel)
+🔥 Verse streak tracking
+📈 Game activity logging""",
+            inline=True
+        )
+        
+        embed.add_field(
+            name="📊 v2.7 Analytics (NEW)",
+            value="""🏆 `/leaderboard` – Top 10 hráči
+📊 `/serverstats` – Server aktivita
+📈 `/myactivity` – Tvůj profil
+📅 `/weeklysummary` – Týdenní trend""",
+            inline=True
+        )
+        
+        embed.add_field(
+            name="🎁 Free Games",
+            value="""🟣 Epic Games
+🎮 Steam (Reddit)
+🎪 PlayStation Plus""",
+            inline=True
+        )
+        
+        embed.add_field(
+            name="📚 Dokumentace",
+            value="[GitHub](https://github.com/Braska-botmaker/Chatbot-discord-JESUS) | [Docs](https://github.com/Braska-botmaker/Chatbot-discord-JESUS/tree/main/docs)",
+            inline=False
+        )
+        
+        embed.set_footer(text="🙏 Jesus Bot – Made with ❤️")
         await interaction.response.send_message(embed=embed)
+        
     except Exception as e:
         await interaction.response.send_message(f"❌ Error: {str(e)[:100]}")
 
 @bot.tree.command(name="commands", description="Zobraz všechny dostupné příkazy")
 async def commands_command(interaction: discord.Interaction):
-    """Show all available commands."""
+    """Show all available commands organized by category."""
     try:
-        embed = discord.Embed(title="📋 Commands – Jesus Discord Bot v2.6.4", color=discord.Color.blue())
-        embed.add_field(name="🎵 Music (+XP)", value="""
-/yt <url> – Přidej skladbu/playlist (YouTube, +1-2 XP)
-/skip – Přeskoči skladbu (+1-2 XP)
-/pause – Pozastavit
-/resume – Obnovit
-/stop – Zastavit & vyčistit
-/leave – Odejít z voice
-/np – Právě se hraje
-/queue – Fronta skladeb
-/shuffle – Zamíchat frontu (+1-2 XP)
-/voicetest – Ověřit voice
-""", inline=False)
-        embed.add_field(name="📖 Bible & Other", value="""
-/verse – Náhodný biblický verš
-/bless [@user] – Požehnání
-/biblicquiz – Bible trivia (+1-2 XP)
-/freegames – Free games (Epic Games, Steam, PlayStation Plus)
-/version – Info o verzi
-/diag – Diagnostika
-/commands – Tato nápověda
-""", inline=False)
-        embed.add_field(name="⚙️ Admin & XP (v2.5+)", value="""
-/setchannel <type> <channel> – Nastav kanál
-/config – Zobraz konfiguraci
-/profile [@user] – Tvůj profil s XP
-""", inline=False)
-        embed.add_field(name="🎮 Minigames (v2.4+)", value="""
-/versfight @user – Veršový duel
-""", inline=False)
-        embed.add_field(name="✨ NEW v2.6.3", value="""
-🎮 Konsolidované zdroje her zdarma (Epic, Steam, PlayStation)
-🖼️ Obrázky pro každou hru z native API
-🔧 Odstraněny nefunkční platformy (GOG, Prime, Reddit, IsThereAnyDeal)
-✅ Fokus na 3 stabilní a spolehlivé zdroje
-📦 Nový tools/free_games.py pro testování
-""", inline=False)
-        await interaction.response.send_message(embed=embed)
+        # Embed 1: Music & Voice
+        embed1 = discord.Embed(
+            title="🎵 HUDBA & VOICE",
+            color=discord.Color.blurple(),
+            description="Příkazy pro přehrávání hudby a voice chat"
+        )
+        
+        embed1.add_field(
+            name="/yt <url>",
+            value="Přidej skladbu nebo playlist do fronty\n🆙 **+1-2 XP**",
+            inline=False
+        )
+        embed1.add_field(
+            name="/skip | /pause | /resume | /stop",
+            value="Ovládání přehrávání\n🆙 **+1-2 XP za skip**",
+            inline=False
+        )
+        embed1.add_field(
+            name="/np | /queue",
+            value="Zobraz právě hrající skladbu / frontu",
+            inline=False
+        )
+        embed1.add_field(
+            name="/shuffle | /leave | /voicetest",
+            value="Zamíchej frontu / Odejdi / Ověř voice\n🆙 **+1-2 XP za shuffle**",
+            inline=False
+        )
+        
+        # Embed 2: Bible & Minigames
+        embed2 = discord.Embed(
+            title="📖 BIBLE & MINIHRY",
+            color=discord.Color.purple(),
+            description="Biblické příkazy a interaktivní minihry"
+        )
+        
+        embed2.add_field(
+            name="/verse",
+            value="Náhodný biblický verš",
+            inline=False
+        )
+        embed2.add_field(
+            name="/bless [@user]",
+            value="Požehnání pro hráče (1h cooldown)",
+            inline=False
+        )
+        embed2.add_field(
+            name="/biblicquiz",
+            value="Biblický trivia kviz – 10 otázek\n🆙 **+1-2 XP za vítězství**",
+            inline=False
+        )
+        embed2.add_field(
+            name="/versfight @user",
+            value="Veršový duel s jiným hráčem\n🆙 **+15 XP za vítězství**",
+            inline=False
+        )
+        embed2.add_field(
+            name="/rollblessing",
+            value="RNG požehnání hra (1h cooldown)\n🆙 **+5 XP za vítězství**",
+            inline=False
+        )
+        
+        # Embed 3: Analytics (NEW v2.7)
+        embed3 = discord.Embed(
+            title="📊 SERVER ANALYTICS (v2.7 NEW)",
+            color=discord.Color.green(),
+            description="Statistiky a leaderboardy serveru"
+        )
+        
+        embed3.add_field(
+            name="/serverstats",
+            value="Přehled serverových aktivit\n👥 Uživatelé | ⭐ XP | 🎵 Hudba | 🏆 Top hry",
+            inline=False
+        )
+        embed3.add_field(
+            name="/leaderboard",
+            value="Top 10 hráčů podle XP\n📊 Level | 🔥 Verse Streak | 🏆 Pořadí",
+            inline=False
+        )
+        embed3.add_field(
+            name="/myactivity",
+            value="Tvůj osobní profil\n⭐ XP & Level | 🔥 Streak | 🎯 Top hry | 🏅 Dosažení",
+            inline=False
+        )
+        embed3.add_field(
+            name="/weeklysummary",
+            value="Týdenní shrnutí\n📅 Poslední 7 dní | ⏱️ Čas hrání | 🏆 Top hráči týdne",
+            inline=False
+        )
+        
+        # Embed 4: Other
+        embed4 = discord.Embed(
+            title="🎁 OSTATNÍ & ADMIN",
+            color=discord.Color.orange(),
+            description="Další příkazy a nastavení"
+        )
+        
+        embed4.add_field(
+            name="/freegames",
+            value="Hry zdarma z 3 zdrojů\n🟣 Epic Games | 🎮 Steam | 🎪 PlayStation Plus",
+            inline=False
+        )
+        embed4.add_field(
+            name="/xp",
+            value="Zobrazit tvoje XP a level",
+            inline=False
+        )
+        embed4.add_field(
+            name="/setchannel <typ> <kanál>",
+            value="Nastav kanál pro požehnání nebo hry (ADMIN)",
+            inline=False
+        )
+        embed4.add_field(
+            name="/config",
+            value="Zobraz konfiguraci serveru (ADMIN)",
+            inline=False
+        )
+        embed4.add_field(
+            name="/diag",
+            value="Diagnostika bota (Debug info)",
+            inline=False
+        )
+        
+        embed4.add_field(
+            name="/version",
+            value="Info o verzi bota",
+            inline=False
+        )
+        
+        embed4.add_field(
+            name="/commands",
+            value="Tento seznam příkazů",
+            inline=False
+        )
+        
+        # Send all embeds
+        await interaction.response.send_message(embeds=[embed1, embed2, embed3, embed4])
+        
     except Exception as e:
         await interaction.response.send_message(f"❌ Chyba: {str(e)[:100]}")
 
@@ -2111,7 +2516,7 @@ async def diag_command(interaction: discord.Interaction):
     voice_count = len(bot.voice_clients)
     embed.add_field(name="🎤 Voice", value=f"Connected: {voice_count}", inline=True)
     if bot.user:
-        embed.add_field(name="⏱️ Version", value="v2.6.4\nFree Games (Epic, Steam, PSN)", inline=True)
+        embed.add_field(name="⏱️ Version", value="v2.7\nServer Analytics & Summary (Leaderboards)", inline=True)
     await interaction.followup.send(embed=embed)
 
 @bot.tree.command(name="setchannel", description="Nastav kanál pro požehnání nebo hry zdarma")

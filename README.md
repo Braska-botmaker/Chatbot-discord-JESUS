@@ -1,6 +1,6 @@
 # ✝️ Ježíš Discord Bot – hudba, verše a hry zdarma 🙏
 
-**Verze:** v2.6.7 – Free Games (Epic, Steam Reddit, PlayStation) | **Platform:** Raspberry Pi Ready
+**Verze:** v2.7 – Server Analytics & Summary (Leaderboards) | **Platform:** Raspberry Pi Ready
 
 Discord bot napsaný v Pythonu (discord.py), který umí:
 
@@ -9,8 +9,7 @@ Discord bot napsaný v Pythonu (discord.py), který umí:
 * 🙏 Žehnat hráčům při spuštění her a reagovat na společné hrání ve voice
 * 🎁 Kadý večer publikovat „Hry zdarma” z Epic, Steam, PlayStation Plus s **individuálními embedy, obrázky**
 * 🔘 NOVÉ v2.6.5: Jednotný design embeda – `/freegames` = automatické posílání, PS+ články v jednom embedu
-* 🎮 NOVÉ v2.6.6: Steam Limited-Time Giveaways přes Reddit API `/r/FreeGameFindings`
-* ⚙️ Konfigurovat kanály per-guild s `/setchannel` a `/config`
+* 🎮 NOVÉ v2.6.6: Steam Limited-Time Giveaways přes Reddit API `/r/FreeGameFindings`* 📊 **NOVÉ v2.7**: Server Analytics s leaderboardy – `/serverstats`, `/leaderboard`, `/myactivity`, `/weeklysummary`* ⚙️ Konfigurovat kanály per-guild s `/setchannel` a `/config`
 * 🎮 Minihry s XP systémem (kviz, veršový duel, RNG požehnání)
 * ✨ XP odměny za hudbu a hlasovou aktivitu s anti-cheat ochranou
 * ℹ️ Slash commands: `/commands`, `/version`, `/diag` s automatickým autocomplete
@@ -191,6 +190,13 @@ Hezký přehled najdete v `/commands`. Základ:
 * `/verse` – náhodný biblický verš do chatu
 * `/bless [@user]` – krátké osobní požehnání pro uživatele
 * `/biblicquiz` – biblický trivia s 10+ otázkami - **+1-2 XP**
+
+### Server Analytics (v2.7)
+
+* `/serverstats` – přehled aktivit, hudby a top her na serveru
+* `/leaderboard` – Top 10 hráčů podle XP s verse streaky
+* `/myactivity` – tvoje osobní statistiky, top hry a dosažení
+* `/weeklysummary` – týdenní shrnutí aktivit a top hráčů týdne
 
 ### Ostatní
 

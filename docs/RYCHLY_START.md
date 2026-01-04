@@ -65,9 +65,12 @@ Bot je přihlášen jako Ježíš#4405
 ## ✅ Hotovo! Testuj v Discordu
 
 ```
-!commands      # Seznam příkazů
-!verš          # Náhodný verš
-!play https://www.youtube.com/watch?v=dQw4w9WgXcQ
+/commands       # Seznam příkazů
+/verse          # Náhodný verš
+/yt https://www.youtube.com/watch?v=dQw4w9WgXcQ
+/serverstats    # Server Analytics (v2.7)
+/myactivity     # Tvůj profil (v2.7)
+/leaderboard    # Leaderboard (v2.7)
 ```
 
 ---

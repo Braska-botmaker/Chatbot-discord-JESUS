@@ -4,6 +4,62 @@ Všechny změny v tomto projektu jsou zaznamenány v tomto souboru.
 
 ---
 
+## [v2.7] – 2026-01-04
+
+### ✨ Nové funkce
+
+#### Server Analytics & Summary – kompletní přehled aktivit 📊
+- **4 nové slash commands** pro analytiku a statistiky serveru (v2.7)
+  
+##### `/serverstats` – Přehled serverových aktivit
+- 👥 Celkový počet uživatelů a aktivních hráčů
+- ⭐ Agregované Experience Points na serveru
+- 🎵 Počet skladeb v běžných hudebních frontách
+- 🏆 Top 5 nejhranějších her na serveru
+
+##### `/leaderboard` – Leaderboard Top 10
+- 🏆 Seřazení hráčů podle Experience Points (XP)
+- 📊 Zobrazení levelu pro každého hráče
+- 🔥 Verse streak (počet dní modlitby) pro top hráče
+- 🎖️ Vizuální pořadí s pozicemi
+
+##### `/myactivity` – Osobní profil & dosažení
+- ⭐ Tvoje aktuální XP a level
+- 🔥 Tvůj verse streak (počet dní v řadě)
+- 🎯 Top 5 tvých nejhranějších her s dobou hrání
+- 🏅 Automatické dosažení (Achievements):
+  - 🌟 Veterán (100+ XP)
+  - 👑 Mistr (500+ XP)
+  - 🔥 Věrný (7+ dnů streaku)
+  - 🎮 Hráč (3+ různých her)
+
+##### `/weeklysummary` – Týdenní trend analýza
+- 📅 Analýza poslední 7 dnů
+- ⏱️ Celkový čas strávený hráním na serveru
+- 👥 Počet aktivních hráčů v týdnu
+- 🏆 Top 5 hráčů týdne podle hrané doby
+
+#### Agregace dat z multiple zdrojů 📈
+- **XP systém**: Sledování experience z hudby, miniher, interakcí
+- **Game activity**: Agregace všech her hraných všemi uživateli
+- **Verse streak**: Kombinace modlitební aktivity s leaderboardem
+- **Music history**: Sledování skladeb v hudbě frontách
+
+### 🎯 Vylepšení UX
+
+- Barevné embedy s logickými sekcemi pro přehlednost
+- Emojis pro jasnou identifikaci údajů
+- Anti-cheat ochrana proti falšování dat
+- Fallback error handling pro chybějící data
+
+### 📝 Dokumentace
+
+- Aktualizován README.md – přidány v2.7 commands
+- Aktualizován header bot.py na v2.7
+- Aktualizován /version command s novým popisem
+
+---
+
 ## [v2.6.7] – 2025-12-18
 
 ### 🔧 Bugfixy & Optimalizace
