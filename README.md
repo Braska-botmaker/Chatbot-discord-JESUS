@@ -1,6 +1,6 @@
 # ✝️ Ježíš Discord Bot – hudba, verše a hry zdarma 🙏
 
-**Verze:** v2.7 – Server Analytics & Summary (Leaderboards) | **Platform:** Raspberry Pi Ready
+**Verze:** v2.7.1 – Server Analytics & Summary (Improved) | **Platform:** Raspberry Pi Ready
 
 Discord bot napsaný v Pythonu (discord.py), který umí:
 
@@ -191,12 +191,11 @@ Hezký přehled najdete v `/commands`. Základ:
 * `/bless [@user]` – krátké osobní požehnání pro uživatele
 * `/biblicquiz` – biblický trivia s 10+ otázkami - **+1-2 XP**
 
-### Server Analytics (v2.7)
+### Server Analytics (v2.7.1)
 
-* `/serverstats` – přehled aktivit, hudby a top her na serveru
-* `/leaderboard` – Top 10 hráčů podle XP s verse streaky
-* `/myactivity` – tvoje osobní statistiky, top hry a dosažení
-* `/weeklysummary` – týdenní shrnutí aktivit a top hráčů týdne
+* `/serverstats` – přehled aktivit, hudby (ve frontě + přehrané) a top her na serveru
+* `/leaderboard` – Top 10 hráčů podle XP s hodinami hraní
+* `/weeklysummary` – automaticky se posílá každý týden do požehnání kanálu
 
 ### Ostatní
 

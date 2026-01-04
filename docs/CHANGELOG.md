@@ -4,6 +4,92 @@ Všechny změny v tomto projektu jsou zaznamenány v tomto souboru.
 
 ---
 
+## [v2.7.1] – 2026-01-04
+
+### ✨ Nové funkce
+
+#### 📊 Global Statistics Tracking – Kompletní systém statistik
+- **Persistent counter** pro všechny metriky uložený v `bot_data.json`
+- ✅ **All-time metrics** (celoživotní sledování):
+  - `songs_played_total` – Počet všech přehraných skladeb
+  - `xp_total` – Agregované XP všech hráčů (all-time)
+  - `game_hours_total` – Součet všech herních hodin (all-time)
+- ✅ **Weekly metrics** (resetují se každý týden):
+  - `weekly_songs_played` – Skladby přehrané v aktuálním týdnu
+  - `weekly_xp_gained` – XP získané v aktuálním týdnu
+  - `weekly_game_hours` – Herní hodiny v aktuálním týdnu
+  - `last_weekly_reset` – Timestamp posledního resetu
+
+#### 🎵 Přesný počet přehraných skladeb
+- ❌ Zrušen odhad na základě XP (nepřesný, XP pochází z mnoha zdrojů)
+- ✅ Přidán přesný counter, který se inkrementuje v `play_next()`
+- ✅ Uloženo v `stats_data["songs_played_total"]`
+- ✅ `/serverstats` nyní zobrazuje skutečný počet skladeb (ne odhad)
+
+#### 📈 Weekly Tracking – Sledování aktivit za týden
+- ✅ **Inkrementace all-time metrics:**
+  - `increment_songs_played()` – Volá se v `play_next()` po přehrání skladby
+  - `increment_xp_stats(xp_amount)` – Volá se v `add_xp_to_user()` po přidělení XP
+  - `increment_game_hours(hours)` – Volá se v `track_user_activity()` při sledování her
+- ✅ **Reset weekly metrics v send_weekly_summary():**
+  - `reset_weekly_stats()` – Resetuje všechny weekly metriky po odeslání summary
+  - Automaticky se volá po zobrazení týdenního shrnutí
+  - Uloží timestamp resetu pro audit trail
+
+#### 📅 Vylepšená Weekly Summary
+- ✅ Zobrazuje teď 3 klíčové metriky:
+  - ⏱️ **Čas hrání** – Celkový čas ze `game_activity` (poslední 7 dní)
+  - ⭐ **XP v týdnu** – `weekly_xp_gained` (nové)
+  - 🎵 **Skladby** – `weekly_songs_played` (nově přesný counter)
+- ✅ Reset všech weekly stats po odeslání
+- ✅ Print debug info: zobrazuje all-time stats po resetu
+
+#### 💾 JSON Persistence
+- ✅ `load_stats_from_storage()` – Načítá statistiky z `bot_data.json` v `on_ready()`
+- ✅ `save_stats_to_storage()` – Asynchronně ukládá po každé změně
+- ✅ Struktura: `db["stats"]` s 8 klíči (all-time + weekly + reset timestamp)
+- ✅ Bezpečné načtení s fallback default hodnotami (0 nebo None)
+
+### 🔧 Technické vylepšení
+
+#### Thread-safety & Race Conditions
+- ✅ Všechny `increment_*` funkce jsou synchronní (bez async)
+- ✅ Ukládání do JSON se provádí asynchronně (`asyncio.create_task()`)
+- ✅ Všechny funkce mají `global stats_data` deklaraci
+- ✅ Bez conflicts s ostatními systémy (`game_activity`, `user_xp`)
+
+#### Optimization
+- ✅ Minimální overhead – inkrementace je O(1) operace
+- ✅ Asynchronní I/O neblokuje hlavní loop
+- ✅ Weekly summary task má `@before_loop` pro správný startup
+
+#### Code Quality
+- ✅ Žádné zdvojení dat – všechny funkce se volají jen jednou
+- ✅ Zálohy v print debug statements pro audit trail
+- ✅ Správná error handling se try/except bloky
+
+### 📝 Změny v příkazech
+
+#### `/serverstats` – Aktualizace
+- ✅ Zobrazuje teď skutečný počet skladeb z `stats_data["songs_played_total"]`
+- ❌ Zrušen odhad na základě XP (proporcí 1-2 XP)
+- ✅ Stejné formáty a emojis jako dříve
+
+#### `send_weekly_summary()` task – Rozšíření
+- ✅ Zobrazuje 3 metriky místo 2
+- ✅ Uloží weekly stats PŘED resetem do lokálních proměnných
+- ✅ Reset se provede PO odeslání všech zpráv (důležité!)
+- ✅ Debug print s all-time stats
+
+### ✅ Testování
+
+- ✅ Bez syntax errors – kompletní kontrola kódu
+- ✅ `/profile` příkaz není ovlivněn – používá jiné datové zdroje
+- ✅ Všechny increment funkce jsou volány správně a jen jednou
+- ✅ Persistence otestována – správné ukládání do JSON
+
+---
+
 ## [v2.7] – 2026-01-04
 
 ### ✨ Nové funkce

@@ -1,5 +1,5 @@
 # ╔════════════════════════════════════════════════════════════════════════════╗
-# ║    Ježíš Discord Bot v2.7 – Server Analytics & Summary (Leaderboards)      ║
+# ║  Ježíš Discord Bot v2.7.1 – Server Analytics & Summary (Leaderboards)      ║
 # ║                     Kompletní přepis na slash commands                     ║
 # ╚════════════════════════════════════════════════════════════════════════════╝
 
@@ -586,6 +586,10 @@ async def play_next(guild: discord.Guild, text_channel: discord.TextChannel):
             )
         
         vc.play(source, after=after_play)
+        
+        # Inkrementuj counter přehraných skladeb (v2.7.1)
+        increment_songs_played()
+        
         embed = discord.Embed(title="🎵 Přehrávám", description=title, color=discord.Color.blue())
         
         # Přidej tlačítka pro ovládání
@@ -1244,6 +1248,9 @@ async def on_ready():
     # Načti game activity z storage
     await load_game_activity_from_storage()
     
+    # Načti statistics z storage (v2.7.1)
+    await load_stats_from_storage()
+    
     # Validuj game activity data - pokud jsou poškozená, resetuj
     game_reset_needed = False
     for user_id, game_data in list(game_activity.items()):
@@ -1301,6 +1308,7 @@ async def on_ready():
     voice_watchdog.start()
     update_bot_presence.start()
     clear_recent_announcements.start()
+    send_weekly_summary.start()
     track_game_activity_periodic.start()
 
 # ═══════════════════════════════════════════════════════════════════════════════
@@ -1309,7 +1317,7 @@ async def on_ready():
 
 @bot.tree.command(name="serverstats", description="Přehled aktivit, hudby, miniher na serveru")
 async def serverstats_command(interaction: discord.Interaction):
-    """Server-wide analytics – aktivita, hudba, minihry (v2.7)."""
+    """Server-wide analytics – aktivita, hudba, minihry (v2.7.1)."""
     try:
         await interaction.response.defer()
         guild = interaction.guild
@@ -1318,7 +1326,6 @@ async def serverstats_command(interaction: discord.Interaction):
         total_users = guild.member_count
         active_users = 0
         total_xp = 0
-        music_count = 0
         games_played = {}
         
         for user_id, xp_data in user_xp.items():
@@ -1334,16 +1341,15 @@ async def serverstats_command(interaction: discord.Interaction):
                         games_played[game_name] = 0
                     games_played[game_name] += hours
         
-        # Počet skladeb v běžích frontách
-        for queue in music_queues.values():
-            music_count += len(queue)
+        # Odhad přehraných skladeb z global counter (v2.7.1)
+        songs_played = stats_data.get("songs_played_total", 0)
         
         # Top 5 her
         top_games = sorted(games_played.items(), key=lambda x: x[1], reverse=True)[:5]
         
         # Build embed
         embed = discord.Embed(
-            title="📊 **Server Analytics – v2.7**",
+            title="📊 **Server Analytics – v2.7.1**",
             color=discord.Color.purple()
         )
         
@@ -1361,7 +1367,7 @@ async def serverstats_command(interaction: discord.Interaction):
         
         embed.add_field(
             name="🎵 Hudba",
-            value=f"Skladeb v frontě: **{music_count}**",
+            value=f"Přehrané: **{songs_played}** skladeb",
             inline=True
         )
         
@@ -1371,7 +1377,7 @@ async def serverstats_command(interaction: discord.Interaction):
         else:
             embed.add_field(name="🏆 Top hry", value="Zatím žádné", inline=False)
         
-        embed.set_footer(text="v2.7 Analytics | Jesus Bot")
+        embed.set_footer(text="v2.7.1 Analytics | Jesus Bot")
         await interaction.followup.send(embed=embed)
         
     except Exception as e:
@@ -1380,7 +1386,7 @@ async def serverstats_command(interaction: discord.Interaction):
 
 @bot.tree.command(name="leaderboard", description="Leaderboard hráčů podle XP a aktivit")
 async def leaderboard_command(interaction: discord.Interaction):
-    """Top 10 hráčů podle XP, her a verset streak (v2.7)."""
+    """Top 10 hráčů podle XP s hodinami (v2.7.1)."""
     try:
         await interaction.response.defer()
         guild = interaction.guild
@@ -1390,7 +1396,7 @@ async def leaderboard_command(interaction: discord.Interaction):
         
         # Build embed
         embed = discord.Embed(
-            title="🏆 **Leaderboard – Top 10**",
+            title="🏆 **Leaderboard – Top 10 podle XP**",
             description="Pořadí podle Experience Points (XP)",
             color=discord.Color.gold()
         )
@@ -1410,79 +1416,21 @@ async def leaderboard_command(interaction: discord.Interaction):
             streak_data = verse_streak.get(user_id, {})
             streak = streak_data.get("count", 0)
             
-            xp_str += f"{idx}. **{username}** – {xp}XP ({level}) 🔥 Streak: {streak}\n"
+            # Přidej game activity (hodin)
+            game_data = game_activity.get(user_id, {"games": {}})
+            total_hours = sum(hours for hours in game_data.get("games", {}).values() if hours > 0)
+            
+            xp_str += f"{idx}. **{username}**\n   ⭐ {xp}XP ({level}) | 🔥 Streak: {streak} | 🎮 {total_hours:.1f}h\n"
         
         embed.description = xp_str or "Zatím žádní hráči"
-        embed.set_footer(text="v2.7 Leaderboard | Jesus Bot")
+        embed.set_footer(text="v2.7.1 Leaderboard | Jesus Bot")
         await interaction.followup.send(embed=embed)
         
     except Exception as e:
         await interaction.followup.send(f"❌ Chyba: {str(e)[:100]}")
         print(f"[leaderboard] Error: {e}")
 
-@bot.tree.command(name="myactivity", description="Tvoje osobní statistiky a dosažení")
-async def myactivity_command(interaction: discord.Interaction):
-    """Personal stats – XP, hry, verse streak, achievements (v2.7)."""
-    try:
-        await interaction.response.defer()
-        user_id = interaction.user.id
-        
-        # XP data
-        xp_data = user_xp.get(user_id, {"xp": 0, "level": "🟩 Věřící"})
-        
-        # Game activity
-        game_data = game_activity.get(user_id, {"games": {}, "last_update": datetime.datetime.now()})
-        top_games = sorted(game_data.get("games", {}).items(), key=lambda x: x[1], reverse=True)[:5]
-        
-        # Verse streak
-        streak_data = verse_streak.get(user_id, {"count": 0, "last_date": None})
-        
-        # Build embed
-        embed = discord.Embed(
-            title="📈 **Tvůj Profil – v2.7**",
-            description=f"Statistiky pro {interaction.user.mention}",
-            color=discord.Color.blue()
-        )
-        
-        embed.add_field(
-            name="⭐ Experience",
-            value=f"**{xp_data.get('xp', 0)}** XP\n{xp_data.get('level', '🟩 Věřící')}",
-            inline=True
-        )
-        
-        embed.add_field(
-            name="🔥 Verse Streak",
-            value=f"**{streak_data.get('count', 0)}** dní",
-            inline=True
-        )
-        
-        # Top hry
-        if top_games:
-            games_str = "\n".join([f"🎮 **{game}**: {hours:.1f}h" for game, hours in top_games])
-            embed.add_field(name="🎯 Top hry", value=games_str, inline=False)
-        else:
-            embed.add_field(name="🎯 Top hry", value="Zatím jsi nic nehrál(a)", inline=False)
-        
-        # Achievements
-        achievements = []
-        if xp_data.get('xp', 0) >= 100:
-            achievements.append("🌟 Veterán (100+ XP)")
-        if xp_data.get('xp', 0) >= 500:
-            achievements.append("👑 Mistr (500+ XP)")
-        if streak_data.get('count', 0) >= 7:
-            achievements.append("🔥 Věrný (7+ dnů streak)")
-        if len(top_games) >= 3:
-            achievements.append("🎮 Hráč (3+ her)")
-        
-        if achievements:
-            embed.add_field(name="🏅 Dosažení", value="\n".join(achievements), inline=False)
-        
-        embed.set_footer(text="v2.7 Profile | Jesus Bot")
-        await interaction.followup.send(embed=embed)
-        
-    except Exception as e:
-        await interaction.followup.send(f"❌ Chyba: {str(e)[:100]}")
-        print(f"[myactivity] Error: {e}")
+
 
 @bot.tree.command(name="weeklysummary", description="Týdenní shrnutí aktivit (TOP игроків, her, eventů)")
 async def weeklysummary_command(interaction: discord.Interaction):
@@ -1547,12 +1495,12 @@ async def weeklysummary_command(interaction: discord.Interaction):
                 top_str += f"{idx}. **{username}** – {playtime:.1f}h\n"
             embed.add_field(name="🏆 Top hráči týdne", value=top_str, inline=False)
         
-        embed.set_footer(text="v2.7 Weekly Summary | Jesus Bot")
+        embed.set_footer(text="v2.7.1 Leaderboard | Jesus Bot")
         await interaction.followup.send(embed=embed)
         
     except Exception as e:
         await interaction.followup.send(f"❌ Chyba: {str(e)[:100]}")
-        print(f"[weeklysummary] Error: {e}")
+        print(f"[leaderboard] Error: {e}")
 
 # ═══════════════════════════════════════════════════════════════════════════════
 #                11. SLASH COMMANDS – HUDBA / MUSIC
@@ -2300,7 +2248,7 @@ async def version_command(interaction: discord.Interaction):
         
         embed.add_field(
             name="⏱️ Version",
-            value="v2.7\nServer Analytics & Summary (Leaderboards)",
+            value="v2.7.1\nServer Analytics & Summary (Leaderboards)",
             inline=True
         )
         
@@ -2843,6 +2791,107 @@ async def clear_recent_announcements():
     global recently_announced_games
     recently_announced_games.clear()
 
+@tasks.loop(days=7)
+async def send_weekly_summary():
+    """Pošli týdenní shrnutí aktivit do configured kanálu (v2.7.1)."""
+    global stats_data
+    import datetime as dt
+    
+    try:
+        # Ulož všechny weekly stats PŘED resetem (v2.7.1)
+        weekly_songs = stats_data.get('weekly_songs_played', 0)
+        weekly_xp = stats_data.get('weekly_xp_gained', 0)
+        weekly_hours = stats_data.get('weekly_game_hours', 0)
+        
+        # Týdenní trend (poslední 7 dní)
+        now = dt.datetime.now(dt.timezone.utc)
+        week_ago = now - dt.timedelta(days=7)
+        
+        # Sbírá data z poslední týdne
+        weekly_users = {}
+        total_playtime = 0
+        
+        for user_id, game_data in game_activity.items():
+            last_update = game_data.get("last_update", now)
+            if isinstance(last_update, str):
+                try:
+                    last_update = dt.datetime.fromisoformat(last_update)
+                except:
+                    last_update = now
+            
+            if last_update >= week_ago:
+                games = game_data.get("games", {})
+                playtime = sum(hours for hours in games.values() if hours > 0)
+                if playtime > 0:
+                    weekly_users[user_id] = playtime
+                    total_playtime += playtime
+        
+        # Top hráči týdne
+        top_weekly = sorted(weekly_users.items(), key=lambda x: x[1], reverse=True)[:5]
+        
+        # Pošli do všech serverů do configured blessing channelu
+        for guild in bot.guilds:
+            try:
+                # Najdi blessing channel
+                channel = _get_channel_for_type(guild, "blessing")
+                if not channel:
+                    continue
+                
+                # Build embed
+                embed = discord.Embed(
+                    title="📅 **Týdenní Shrnutí Aktivit – v2.7.1**",
+                    description=f"Období: {(now - dt.timedelta(days=7)).strftime('%d.%m')} – {now.strftime('%d.%m.%Y')}",
+                    color=discord.Color.orange()
+                )
+                
+                embed.add_field(
+                    name="⏱️ Čas hrání",
+                    value=f"**{total_playtime:.1f}** h",
+                    inline=True
+                )
+                
+                embed.add_field(
+                    name="⭐ XP v týdnu",
+                    value=f"**{weekly_xp:,}** XP",
+                    inline=True
+                )
+                
+                embed.add_field(
+                    name="🎵 Skladby",
+                    value=f"**{weekly_songs}** skladeb",
+                    inline=True
+                )
+                
+                # Top hráči
+                if top_weekly:
+                    top_str = ""
+                    for idx, (user_id, playtime) in enumerate(top_weekly, 1):
+                        try:
+                            user = await bot.fetch_user(user_id)
+                            username = user.name
+                        except:
+                            username = f"User {user_id}"
+                        top_str += f"{idx}. **{username}** – {playtime:.1f}h\n"
+                    embed.add_field(name="🏆 Top hráči týdne", value=top_str, inline=False)
+                
+                embed.set_footer(text="v2.7.1 Weekly Summary | Jesus Bot")
+                await channel.send(embed=embed)
+                
+            except Exception as e:
+                print(f"[weekly_summary] Error in {guild.name}: {e}")
+        
+        # Reset všech weekly stats PO odeslání všech zpráv (v2.7.1)
+        reset_weekly_stats()
+        print(f"[weekly_summary] Reset: songs=0, xp=0, hours=0 | All-time: {stats_data['songs_played_total']} songs, {stats_data['xp_total']} XP, {stats_data['game_hours_total']:.1f}h")
+    
+    except Exception as e:
+        print(f"[weekly_summary] Error: {e}")
+
+@send_weekly_summary.before_loop
+async def before_weekly_summary():
+    """Čekej na ready před spuštěním weekly summary."""
+    await bot.wait_until_ready()
+
 @send_morning_message.before_loop
 async def before_morning():
     await bot.wait_until_ready()
@@ -3001,6 +3050,9 @@ async def add_xp_to_user(user_id: int, xp_amount: int = 0, reason: str = ""):
     
     user_xp[user_id]["xp"] += xp_amount
     xp_cooldown[user_id] = now
+    
+    # Inkrementuj weekly stats (v2.7.1)
+    increment_xp_stats(xp_amount)
     
     # Uložit data
     await save_user_xp_to_storage()
@@ -3497,6 +3549,84 @@ game_activity = {}  # {user_id: {"games": {game_name: hours}, "last_update": tim
                      # GLOBÁLNÍ data - sdílena mezi všemi servery (logické, user má stejné hry všude)
 guild_role_locks = {}  # {guild_id: asyncio.Lock} - zabránit race conditions při vytváření rolí
 
+# Statistics tracking (v2.7.1)
+stats_data = {
+    # All-time metrics
+    "songs_played_total": 0,       # Celkový počet přehraných skladeb
+    "xp_total": 0,                  # Celkové XP (všichni hráči)
+    "game_hours_total": 0,          # Celkové hodiny her (všichni hráči)
+    # Weekly metrics (resetují se každý týden)
+    "weekly_songs_played": 0,       # Skladby za tento týden
+    "weekly_xp_gained": 0,          # XP získáno tento týden
+    "weekly_game_hours": 0,         # Hodiny her tento týden
+    "last_weekly_reset": None       # Čas posledního resetu weekly stats
+}
+
+async def load_stats_from_storage():
+    """Načti statistiky z bot_data.json (v2.7.1)."""
+    global stats_data
+    try:
+        db = _load_data()
+        stats = db.get("stats", {})
+        stats_data["songs_played_total"] = stats.get("songs_played_total", 0)
+        stats_data["xp_total"] = stats.get("xp_total", 0)
+        stats_data["game_hours_total"] = stats.get("game_hours_total", 0)
+        stats_data["weekly_songs_played"] = stats.get("weekly_songs_played", 0)
+        stats_data["weekly_xp_gained"] = stats.get("weekly_xp_gained", 0)
+        stats_data["weekly_game_hours"] = stats.get("weekly_game_hours", 0)
+        stats_data["last_weekly_reset"] = stats.get("last_weekly_reset", None)
+        print(f"[stats] Loaded: {stats_data['songs_played_total']} songs, {stats_data['xp_total']} total XP, {stats_data['game_hours_total']:.1f}h games")
+    except Exception as e:
+        print(f"[stats] Error loading stats: {e}")
+
+async def save_stats_to_storage():
+    """Ulož statistiky do bot_data.json (v2.7.1)."""
+    try:
+        db = _load_data()
+        db["stats"] = {
+            "songs_played_total": stats_data["songs_played_total"],
+            "xp_total": stats_data["xp_total"],
+            "game_hours_total": stats_data["game_hours_total"],
+            "weekly_songs_played": stats_data["weekly_songs_played"],
+            "weekly_xp_gained": stats_data["weekly_xp_gained"],
+            "weekly_game_hours": stats_data["weekly_game_hours"],
+            "last_weekly_reset": stats_data["last_weekly_reset"]
+        }
+        await _save_data(db)
+    except Exception as e:
+        print(f"[stats] Error saving stats: {e}")
+
+def increment_songs_played():
+    """Inkrementuj počet přehraných skladeb (v2.7.1)."""
+    global stats_data
+    stats_data["songs_played_total"] += 1
+    stats_data["weekly_songs_played"] += 1
+    asyncio.create_task(save_stats_to_storage())
+
+def increment_xp_stats(xp_amount: int):
+    """Inkrementuj XP statistiky (v2.7.1)."""
+    global stats_data
+    stats_data["xp_total"] += xp_amount
+    stats_data["weekly_xp_gained"] += xp_amount
+    asyncio.create_task(save_stats_to_storage())
+
+def increment_game_hours(hours: float):
+    """Inkrementuj hodiny her (v2.7.1)."""
+    global stats_data
+    stats_data["game_hours_total"] += hours
+    stats_data["weekly_game_hours"] += hours
+    asyncio.create_task(save_stats_to_storage())
+
+def reset_weekly_stats():
+    """Resetuj všechny weekly stats po týdnu (v2.7.1)."""
+    global stats_data
+    import datetime
+    stats_data["weekly_songs_played"] = 0
+    stats_data["weekly_xp_gained"] = 0
+    stats_data["weekly_game_hours"] = 0
+    stats_data["last_weekly_reset"] = datetime.datetime.now(datetime.timezone.utc).isoformat()
+    asyncio.create_task(save_stats_to_storage())
+
 def get_guild_role_lock(guild_id: int) -> asyncio.Lock:
     """Vrátí lock pro guild - zabránit race conditions."""
     if guild_id not in guild_role_locks:
@@ -3532,6 +3662,9 @@ def track_user_activity(member: discord.Member, reset_on_new_game: bool = False)
         last_update = user_data["last_update"]
         time_delta = (now - last_update).total_seconds() / 3600
         user_data["games"][game_name] += time_delta
+        
+        # Inkrementuj weekly game hours (v2.7.1)
+        increment_game_hours(time_delta)
     
     # Aktualizuj last_update na teď (bez ohledu na reset_on_new_game)
     user_data["last_update"] = now
