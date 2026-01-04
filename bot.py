@@ -2045,21 +2045,31 @@ def increment_songs_played():
     global stats_data
     stats_data["songs_played_total"] += 1
     stats_data["weekly_songs_played"] += 1
-    asyncio.create_task(save_stats_to_storage())
+    try:
+        asyncio.create_task(save_stats_to_storage())
+    except RuntimeError:
+        # Pokud nema event loop (startup), zkus ji spustit nezávisle
+        pass
 
 def increment_xp_stats(xp_amount: int):
     """Inkrementuj XP statistiky (v2.7.1)."""
     global stats_data
     stats_data["xp_total"] += xp_amount
     stats_data["weekly_xp_gained"] += xp_amount
-    asyncio.create_task(save_stats_to_storage())
+    try:
+        asyncio.create_task(save_stats_to_storage())
+    except RuntimeError:
+        pass
 
 def increment_game_hours(hours: float):
     """Inkrementuj hodiny her (v2.7.1)."""
     global stats_data
     stats_data["game_hours_total"] += hours
     stats_data["weekly_game_hours"] += hours
-    asyncio.create_task(save_stats_to_storage())
+    try:
+        asyncio.create_task(save_stats_to_storage())
+    except RuntimeError:
+        pass
 
 def reset_weekly_stats():
     """Resetuj všechny weekly stats po týdnu (v2.7.1)."""
@@ -2069,7 +2079,10 @@ def reset_weekly_stats():
     stats_data["weekly_xp_gained"] = 0
     stats_data["weekly_game_hours"] = 0
     stats_data["last_weekly_reset"] = datetime.datetime.now(datetime.timezone.utc).isoformat()
-    asyncio.create_task(save_stats_to_storage())
+    try:
+        asyncio.create_task(save_stats_to_storage())
+    except RuntimeError:
+        pass
 
 async def load_user_xp_from_storage():
     """Načti user XP z persistent storage (bot_data.json)."""
@@ -2875,7 +2888,7 @@ async def clear_recent_announcements():
     global recently_announced_games
     recently_announced_games.clear()
 
-@tasks.loop(days=7)
+@tasks.loop(hours=168)
 async def send_weekly_summary():
     """Pošli týdenní shrnutí aktivit do configured kanálu (v2.7.1)."""
     global stats_data
