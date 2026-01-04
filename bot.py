@@ -1238,7 +1238,7 @@ async def on_ready():
     # 🔧 Inicializuj prázdný JSON pokud neexistuje (bezpečnost)
     db = _load_data()
     if not db:
-        db = {"verse_streak": {}, "game_activity": {}, "user_xp": {}}
+        db = {"verse_streak": {}, "game_activity": {}, "user_xp": {}, "stats": {}}
         await _save_data(db)
         print("[init] ✅ Vytvořen nový bot_data.json")
     
@@ -1397,7 +1397,6 @@ async def leaderboard_command(interaction: discord.Interaction):
         # Build embed
         embed = discord.Embed(
             title="🏆 **Leaderboard – Top 10 podle XP**",
-            description="Pořadí podle Experience Points (XP)",
             color=discord.Color.gold()
         )
         
@@ -1422,7 +1421,11 @@ async def leaderboard_command(interaction: discord.Interaction):
             
             xp_str += f"{idx}. **{username}**\n   ⭐ {xp}XP ({level}) | 🔥 Streak: {streak} | 🎮 {total_hours:.1f}h\n"
         
-        embed.description = xp_str or "Zatím žádní hráči"
+        if xp_str:
+            embed.add_field(name="🏆 Top 10 Hráči", value=xp_str, inline=False)
+        else:
+            embed.add_field(name="🏆 Top 10 Hráči", value="Zatím žádní hráči", inline=False)
+        
         embed.set_footer(text="v2.7.1 Leaderboard | Jesus Bot")
         await interaction.followup.send(embed=embed)
         
@@ -1986,6 +1989,87 @@ async def save_game_activity_to_storage():
         await _save_data(db)
     except Exception as e:
         print(f"[game_activity] Failed to save: {e}")
+
+# ═══════════════════════════════════════════════════════════════════════════════
+#                 STATISTICS TRACKING (v2.7.1)
+# ═══════════════════════════════════════════════════════════════════════════════
+
+stats_data = {
+    # All-time metrics
+    "songs_played_total": 0,       # Celkový počet přehraných skladeb
+    "xp_total": 0,                  # Celkové XP (všichni hráči)
+    "game_hours_total": 0,          # Celkové hodiny her (všichni hráči)
+    # Weekly metrics (resetují se každý týden)
+    "weekly_songs_played": 0,       # Skladby za tento týden
+    "weekly_xp_gained": 0,          # XP získáno tento týden
+    "weekly_game_hours": 0,         # Hodiny her tento týden
+    "last_weekly_reset": None       # Čas posledního resetu weekly stats
+}
+
+async def load_stats_from_storage():
+    """Načti statistiky z bot_data.json (v2.7.1)."""
+    global stats_data
+    try:
+        db = _load_data()
+        stats = db.get("stats", {})
+        stats_data["songs_played_total"] = stats.get("songs_played_total", 0)
+        stats_data["xp_total"] = stats.get("xp_total", 0)
+        stats_data["game_hours_total"] = stats.get("game_hours_total", 0)
+        stats_data["weekly_songs_played"] = stats.get("weekly_songs_played", 0)
+        stats_data["weekly_xp_gained"] = stats.get("weekly_xp_gained", 0)
+        stats_data["weekly_game_hours"] = stats.get("weekly_game_hours", 0)
+        stats_data["last_weekly_reset"] = stats.get("last_weekly_reset", None)
+        print(f"[stats] Loaded: {stats_data['songs_played_total']} songs, {stats_data['xp_total']} total XP, {stats_data['game_hours_total']:.1f}h games")
+    except Exception as e:
+        print(f"[stats] Error loading stats: {e}")
+
+async def save_stats_to_storage():
+    """Ulož statistiky do bot_data.json (v2.7.1)."""
+    try:
+        db = _load_data()
+        db["stats"] = {
+            "songs_played_total": stats_data["songs_played_total"],
+            "xp_total": stats_data["xp_total"],
+            "game_hours_total": stats_data["game_hours_total"],
+            "weekly_songs_played": stats_data["weekly_songs_played"],
+            "weekly_xp_gained": stats_data["weekly_xp_gained"],
+            "weekly_game_hours": stats_data["weekly_game_hours"],
+            "last_weekly_reset": stats_data["last_weekly_reset"]
+        }
+        await _save_data(db)
+    except Exception as e:
+        print(f"[stats] Error saving stats: {e}")
+
+def increment_songs_played():
+    """Inkrementuj počet přehraných skladeb (v2.7.1)."""
+    global stats_data
+    stats_data["songs_played_total"] += 1
+    stats_data["weekly_songs_played"] += 1
+    asyncio.create_task(save_stats_to_storage())
+
+def increment_xp_stats(xp_amount: int):
+    """Inkrementuj XP statistiky (v2.7.1)."""
+    global stats_data
+    stats_data["xp_total"] += xp_amount
+    stats_data["weekly_xp_gained"] += xp_amount
+    asyncio.create_task(save_stats_to_storage())
+
+def increment_game_hours(hours: float):
+    """Inkrementuj hodiny her (v2.7.1)."""
+    global stats_data
+    stats_data["game_hours_total"] += hours
+    stats_data["weekly_game_hours"] += hours
+    asyncio.create_task(save_stats_to_storage())
+
+def reset_weekly_stats():
+    """Resetuj všechny weekly stats po týdnu (v2.7.1)."""
+    global stats_data
+    import datetime
+    stats_data["weekly_songs_played"] = 0
+    stats_data["weekly_xp_gained"] = 0
+    stats_data["weekly_game_hours"] = 0
+    stats_data["last_weekly_reset"] = datetime.datetime.now(datetime.timezone.utc).isoformat()
+    asyncio.create_task(save_stats_to_storage())
 
 async def load_user_xp_from_storage():
     """Načti user XP z persistent storage (bot_data.json)."""
@@ -3548,84 +3632,6 @@ async def profile_command(interaction: discord.Interaction, user: discord.User =
 game_activity = {}  # {user_id: {"games": {game_name: hours}, "last_update": timestamp}}
                      # GLOBÁLNÍ data - sdílena mezi všemi servery (logické, user má stejné hry všude)
 guild_role_locks = {}  # {guild_id: asyncio.Lock} - zabránit race conditions při vytváření rolí
-
-# Statistics tracking (v2.7.1)
-stats_data = {
-    # All-time metrics
-    "songs_played_total": 0,       # Celkový počet přehraných skladeb
-    "xp_total": 0,                  # Celkové XP (všichni hráči)
-    "game_hours_total": 0,          # Celkové hodiny her (všichni hráči)
-    # Weekly metrics (resetují se každý týden)
-    "weekly_songs_played": 0,       # Skladby za tento týden
-    "weekly_xp_gained": 0,          # XP získáno tento týden
-    "weekly_game_hours": 0,         # Hodiny her tento týden
-    "last_weekly_reset": None       # Čas posledního resetu weekly stats
-}
-
-async def load_stats_from_storage():
-    """Načti statistiky z bot_data.json (v2.7.1)."""
-    global stats_data
-    try:
-        db = _load_data()
-        stats = db.get("stats", {})
-        stats_data["songs_played_total"] = stats.get("songs_played_total", 0)
-        stats_data["xp_total"] = stats.get("xp_total", 0)
-        stats_data["game_hours_total"] = stats.get("game_hours_total", 0)
-        stats_data["weekly_songs_played"] = stats.get("weekly_songs_played", 0)
-        stats_data["weekly_xp_gained"] = stats.get("weekly_xp_gained", 0)
-        stats_data["weekly_game_hours"] = stats.get("weekly_game_hours", 0)
-        stats_data["last_weekly_reset"] = stats.get("last_weekly_reset", None)
-        print(f"[stats] Loaded: {stats_data['songs_played_total']} songs, {stats_data['xp_total']} total XP, {stats_data['game_hours_total']:.1f}h games")
-    except Exception as e:
-        print(f"[stats] Error loading stats: {e}")
-
-async def save_stats_to_storage():
-    """Ulož statistiky do bot_data.json (v2.7.1)."""
-    try:
-        db = _load_data()
-        db["stats"] = {
-            "songs_played_total": stats_data["songs_played_total"],
-            "xp_total": stats_data["xp_total"],
-            "game_hours_total": stats_data["game_hours_total"],
-            "weekly_songs_played": stats_data["weekly_songs_played"],
-            "weekly_xp_gained": stats_data["weekly_xp_gained"],
-            "weekly_game_hours": stats_data["weekly_game_hours"],
-            "last_weekly_reset": stats_data["last_weekly_reset"]
-        }
-        await _save_data(db)
-    except Exception as e:
-        print(f"[stats] Error saving stats: {e}")
-
-def increment_songs_played():
-    """Inkrementuj počet přehraných skladeb (v2.7.1)."""
-    global stats_data
-    stats_data["songs_played_total"] += 1
-    stats_data["weekly_songs_played"] += 1
-    asyncio.create_task(save_stats_to_storage())
-
-def increment_xp_stats(xp_amount: int):
-    """Inkrementuj XP statistiky (v2.7.1)."""
-    global stats_data
-    stats_data["xp_total"] += xp_amount
-    stats_data["weekly_xp_gained"] += xp_amount
-    asyncio.create_task(save_stats_to_storage())
-
-def increment_game_hours(hours: float):
-    """Inkrementuj hodiny her (v2.7.1)."""
-    global stats_data
-    stats_data["game_hours_total"] += hours
-    stats_data["weekly_game_hours"] += hours
-    asyncio.create_task(save_stats_to_storage())
-
-def reset_weekly_stats():
-    """Resetuj všechny weekly stats po týdnu (v2.7.1)."""
-    global stats_data
-    import datetime
-    stats_data["weekly_songs_played"] = 0
-    stats_data["weekly_xp_gained"] = 0
-    stats_data["weekly_game_hours"] = 0
-    stats_data["last_weekly_reset"] = datetime.datetime.now(datetime.timezone.utc).isoformat()
-    asyncio.create_task(save_stats_to_storage())
 
 def get_guild_role_lock(guild_id: int) -> asyncio.Lock:
     """Vrátí lock pro guild - zabránit race conditions."""
