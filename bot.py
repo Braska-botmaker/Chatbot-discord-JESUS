@@ -2487,7 +2487,7 @@ async def version_command(interaction: discord.Interaction):
         
         embed.add_field(
             name="⏱️ Version",
-            value="v2.7.1\nServer Analytics & Summary (Leaderboards)",
+            value="v2.7.2\nServer Analytics & Summary (Leaderboards)",
             inline=True
         )
         
