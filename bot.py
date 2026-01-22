@@ -160,6 +160,7 @@ bot = commands.Bot(command_prefix="/", intents=intents)
 # ═══════════════════════════════════════════════════════════════════════════════
 
 DATA_FILE = pathlib.Path("bot_data.json")
+DATA_BACKUP_FILE = pathlib.Path("bot_data_backup.json")
 _data_lock = asyncio.Lock()
 
 # Game blessing cooldown (user_id -> {game_name -> timestamp})
@@ -167,16 +168,52 @@ _game_blessing_cooldowns = {}
 GAME_BLESSING_COOLDOWN = 3600  # 1 hodina v sekundách
 
 def _load_data():
-    if DATA_FILE.exists():
-        try:
-            return json.loads(DATA_FILE.read_text(encoding="utf-8"))
-        except Exception:
-            return {}
-    return {}
+    """Načti data s fallbackem na backup (ochrana dat)."""
+    try:
+        if DATA_FILE.exists():
+            data_text = DATA_FILE.read_text(encoding="utf-8")
+            data = json.loads(data_text)
+            # Validace: ověř že existují hlavní klíče
+            required_keys = ["verse_streak", "game_activity", "user_xp", "stats"]
+            for key in required_keys:
+                if key not in data:
+                    data[key] = {}
+            return data
+    except json.JSONDecodeError as e:
+        print(f"[DATA] ⚠️ bot_data.json je poškozený: {e}")
+        # Zkus načíst backup
+        if DATA_BACKUP_FILE.exists():
+            try:
+                backup_data = json.loads(DATA_BACKUP_FILE.read_text(encoding="utf-8"))
+                print("[DATA] ✅ Obnoven backup soubor")
+                return backup_data
+            except Exception as e2:
+                print(f"[DATA] ❌ Backup je také poškozený: {e2}")
+    except Exception as e:
+        print(f"[DATA] ❌ Chyba při čtení dat: {e}")
+    
+    return {"verse_streak": {}, "game_activity": {}, "user_xp": {}, "stats": {}}
 
 async def _save_data(db):
+    """Ulož data s automatickým backupem (ochrana dat)."""
     async with _data_lock:
-        DATA_FILE.write_text(json.dumps(db, ensure_ascii=False, indent=2), encoding="utf-8")
+        try:
+            # Nejdřív vytvoř backup starého souboru (pokud existuje)
+            if DATA_FILE.exists():
+                try:
+                    old_data = json.loads(DATA_FILE.read_text(encoding="utf-8"))
+                    DATA_BACKUP_FILE.write_text(json.dumps(old_data, ensure_ascii=False, indent=2), encoding="utf-8")
+                except Exception as e:
+                    print(f"[DATA] ⚠️ Backup selhal: {e}")
+            
+            # Validuj data před uložením
+            if not isinstance(db, dict):
+                raise ValueError("Data nejsou dict")
+            
+            # Ulož nová data
+            DATA_FILE.write_text(json.dumps(db, ensure_ascii=False, indent=2), encoding="utf-8")
+        except Exception as e:
+            print(f"[DATA] ❌ Chyba při ukládání dat: {e}")
 
 def _g(db, gid, key, default):
     """Guild-specific data namespace"""
@@ -1386,7 +1423,7 @@ async def serverstats_command(interaction: discord.Interaction):
 
 @bot.tree.command(name="leaderboard", description="Leaderboard hráčů podle XP a hodin")
 async def leaderboard_command(interaction: discord.Interaction):
-    """Dva leaderboards - XP a hodin (v2.7.1)."""
+    """Dva leaderboards - XP a hodin (v2.7.2 s error handlingem)."""
     try:
         await interaction.response.defer()
         guild = interaction.guild
@@ -1404,15 +1441,16 @@ async def leaderboard_command(interaction: discord.Interaction):
             try:
                 user = await bot.fetch_user(user_id)
                 username = user.name
-            except:
+            except Exception as e:
                 username = f"User {user_id}"
+                print(f"[leaderboard] ⚠️ Nemohl jsem fetch user {user_id}: {e}")
             
-            xp = xp_data.get("xp", 0)
+            xp = max(0, xp_data.get("xp", 0))
             level = xp_data.get("level", "🟩 Věřící")
             
             # Přidej streak informaci
             streak_data = verse_streak.get(user_id, {})
-            streak = streak_data.get("count", 0)
+            streak = max(0, streak_data.get("count", 0))
             
             xp_str += f"{idx}. **{username}**\n   ⭐ {xp}XP ({level}) | 🔥 Streak: {streak}\n"
         
@@ -1421,15 +1459,20 @@ async def leaderboard_command(interaction: discord.Interaction):
         else:
             embed_xp.add_field(name="XP Rebrikář", value="Zatím žádní hráči", inline=False)
         
-        embed_xp.set_footer(text="v2.7.1 Leaderboard | Jesus Bot")
+        embed_xp.set_footer(text="v2.7.2 Leaderboard | Jesus Bot")
         
         # ============ LEADERBOARD 2: PODLE HODIN ============
         # Seřaď hráče podle celkových hodin
         hours_data = {}
         for user_id, game_data in game_activity.items():
-            total_hours = sum(hours for hours in game_data.get("games", {}).values() if hours > 0)
-            if total_hours > 0:
-                hours_data[user_id] = total_hours
+            try:
+                games = game_data.get("games", {})
+                if isinstance(games, dict):
+                    total_hours = sum(float(h) for h in games.values() if isinstance(h, (int, float)) and h > 0)
+                    if total_hours > 0:
+                        hours_data[user_id] = total_hours
+            except Exception as e:
+                print(f"[leaderboard] ⚠️ Chyba při výpočtu hodin pro user {user_id}: {e}")
         
         sorted_hours = sorted(hours_data.items(), key=lambda x: x[1], reverse=True)[:10]
         
@@ -1443,35 +1486,42 @@ async def leaderboard_command(interaction: discord.Interaction):
             try:
                 user = await bot.fetch_user(user_id)
                 username = user.name
-            except:
+            except Exception as e:
                 username = f"User {user_id}"
+                print(f"[leaderboard] ⚠️ Nemohl jsem fetch user {user_id}: {e}")
             
             # Počet her
             game_data = game_activity.get(user_id, {"games": {}})
             num_games = len(game_data.get("games", {}))
             
-            hours_str += f"{idx}. **{username}**\n   🎮 {total_hours:.1f}h ({num_games} her)\n"
+            if isinstance(total_hours, (int, float)) and total_hours > 0:
+                hours_str += f"{idx}. **{username}**\n   🎮 {total_hours:.1f}h ({num_games} her)\n"
         
         if hours_str:
             embed_hours.add_field(name="Časový Rebrikář", value=hours_str, inline=False)
         else:
             embed_hours.add_field(name="Časový Rebrikář", value="Zatím žádná data", inline=False)
         
-        embed_hours.set_footer(text="v2.7.1 Leaderboard | Jesus Bot")
+        embed_hours.set_footer(text="v2.7.2 Leaderboard | Jesus Bot")
         
         # Pošli oba embedy
         await interaction.followup.send(embed=embed_xp)
         await interaction.followup.send(embed=embed_hours)
+        print(f"[leaderboard] ✅ Leaderboard odeslán pro {interaction.user.name}")
         
     except Exception as e:
-        await interaction.followup.send(f"❌ Chyba: {str(e)[:100]}")
-        print(f"[leaderboard] Error: {e}")
+        error_msg = f"❌ Chyba: {str(e)[:100]}"
+        print(f"[leaderboard] ❌ Chyba: {e}")
+        try:
+            await interaction.followup.send(error_msg)
+        except Exception as send_err:
+            print(f"[leaderboard] ⚠️ Nemohl jsem odeslat error message: {send_err}")
 
 
 
-@bot.tree.command(name="weeklysummary", description="Týdenní shrnutí aktivit (TOP игроків, her, eventů)")
+@bot.tree.command(name="weeklysummary", description="Týdenní shrnutí aktivit (TOP hráčů, her, eventů)")
 async def weeklysummary_command(interaction: discord.Interaction):
-    """Weekly summary – top players, games, trends (v2.7)."""
+    """Weekly summary – top players, games, trends (v2.7.2 s error handlingem)."""
     try:
         await interaction.response.defer()
         
@@ -1481,29 +1531,37 @@ async def weeklysummary_command(interaction: discord.Interaction):
         
         # Sbírá data z poslední týdne
         weekly_users = {}
-        total_playtime = 0
+        total_playtime = 0.0
         
         for user_id, game_data in game_activity.items():
-            last_update = game_data.get("last_update", now)
-            if isinstance(last_update, str):
-                try:
-                    last_update = datetime.datetime.fromisoformat(last_update)
-                except:
+            try:
+                last_update = game_data.get("last_update", now)
+                if isinstance(last_update, str):
+                    try:
+                        last_update = datetime.datetime.fromisoformat(last_update)
+                    except:
+                        last_update = now
+                
+                if not isinstance(last_update, datetime.datetime):
                     last_update = now
-            
-            if last_update >= week_ago:
-                games = game_data.get("games", {})
-                playtime = sum(hours for hours in games.values() if hours > 0)
-                if playtime > 0:
-                    weekly_users[user_id] = playtime
-                    total_playtime += playtime
+                
+                if last_update >= week_ago:
+                    games = game_data.get("games", {})
+                    if isinstance(games, dict):
+                        playtime = sum(float(h) for h in games.values() if isinstance(h, (int, float)) and h > 0)
+                        if playtime > 0:
+                            weekly_users[user_id] = playtime
+                            total_playtime += playtime
+            except Exception as e:
+                print(f"[weeklysummary] ⚠️ Chyba při zpracování user {user_id}: {e}")
+                continue
         
         # Top hráči týdne
         top_weekly = sorted(weekly_users.items(), key=lambda x: x[1], reverse=True)[:5]
         
         # Build embed
         embed = discord.Embed(
-            title="📅 **Týdenní Shrnutí – v2.7**",
+            title="📅 **Týdenní Shrnutí – v2.7.2**",
             description=f"Období: {(now - datetime.timedelta(days=7)).strftime('%d.%m')} – {now.strftime('%d.%m.%Y')}",
             color=discord.Color.orange()
         )
@@ -1527,17 +1585,31 @@ async def weeklysummary_command(interaction: discord.Interaction):
                 try:
                     user = await bot.fetch_user(user_id)
                     username = user.name
-                except:
+                except Exception as e:
                     username = f"User {user_id}"
-                top_str += f"{idx}. **{username}** – {playtime:.1f}h\n"
-            embed.add_field(name="🏆 Top hráči týdne", value=top_str, inline=False)
+                    print(f"[weeklysummary] ⚠️ Nemohl jsem fetch user {user_id}: {e}")
+                
+                if isinstance(playtime, (int, float)) and playtime > 0:
+                    top_str += f"{idx}. **{username}** – {playtime:.1f}h\n"
+            
+            if top_str:
+                embed.add_field(name="🏆 Top hráči týdne", value=top_str, inline=False)
+            else:
+                embed.add_field(name="🏆 Top hráči týdne", value="Žádní hráči v datech", inline=False)
+        else:
+            embed.add_field(name="🏆 Top hráči týdne", value="Žádná data dostupná", inline=False)
         
-        embed.set_footer(text="v2.7.1 Leaderboard | Jesus Bot")
+        embed.set_footer(text="v2.7.2 Weekly Summary | Jesus Bot")
         await interaction.followup.send(embed=embed)
+        print(f"[weeklysummary] ✅ Weekly summary odeslán pro {interaction.user.name}")
         
     except Exception as e:
-        await interaction.followup.send(f"❌ Chyba: {str(e)[:100]}")
-        print(f"[leaderboard] Error: {e}")
+        error_msg = f"❌ Chyba: {str(e)[:100]}"
+        print(f"[weeklysummary] ❌ Chyba: {e}")
+        try:
+            await interaction.followup.send(error_msg)
+        except Exception as send_err:
+            print(f"[weeklysummary] ⚠️ Nemohl jsem odeslat error message: {send_err}")
 
 # ═══════════════════════════════════════════════════════════════════════════════
 #                11. SLASH COMMANDS – HUDBA / MUSIC
@@ -1986,20 +2058,27 @@ async def load_game_activity_from_storage():
         print(f"[game_activity] Failed to load: {e}")
 
 async def save_game_activity_to_storage():
-    """Ulož game activity do persistent storage (bot_data.json) - VŽDY KONTROLUJ DATA."""
+    """Ulož game activity do persistent storage (bot_data.json) - VŽDY KONTROLUJ DATA (v2.7.2)."""
     try:
         db = _load_data()
         activity_data = {}
+        error_count = 0
+        
         for user_id, data in game_activity.items():
             last_update_str = None
             if data.get("last_update"):
-                last_update_str = data["last_update"].isoformat()
+                try:
+                    last_update_str = data["last_update"].isoformat()
+                except Exception as e:
+                    print(f"[game_activity] ⚠️ Chyba při konverzi last_update pro user {user_id}: {e}")
+                    last_update_str = datetime.datetime.now().isoformat()
             
             # Validuj games dict
             games_dict = data.get("games", {})
             if not isinstance(games_dict, dict):
-                print(f"[game_activity] CHYBA: user {user_id} má poškozená games data! Resetuji...")
+                print(f"[game_activity] ❌ User {user_id} má poškozená games data! Resetuji...")
                 games_dict = {}
+                error_count += 1
             
             # Validuj všechny hodnoty jsou čísla
             clean_games = {}
@@ -2007,22 +2086,27 @@ async def save_game_activity_to_storage():
                 try:
                     hours_float = float(hours)
                     if hours_float < 0:
-                        print(f"[game_activity] Negativní čas {game_name} pro user {user_id}. Resetuji na 0...")
+                        print(f"[game_activity] ⚠️ Negativní čas {game_name} pro user {user_id}. Resetuji na 0...")
                         clean_games[game_name] = 0
                     else:
                         clean_games[game_name] = hours_float
-                except (ValueError, TypeError):
-                    print(f"[game_activity] Chybný typ hodin pro {game_name} (user {user_id}). Ignoruji...")
+                except (ValueError, TypeError) as e:
+                    print(f"[game_activity] ⚠️ Chybný typ hodin pro {game_name} (user {user_id}): {type(hours)}. Ignoruji...")
+                    error_count += 1
                     continue
             
             activity_data[str(user_id)] = {
                 "games": clean_games,
                 "last_update": last_update_str
             }
+        
         db["game_activity"] = activity_data
         await _save_data(db)
+        
+        if error_count > 0:
+            print(f"[game_activity] ℹ️ Opraveno {error_count} chyb při ukládání")
     except Exception as e:
-        print(f"[game_activity] Failed to save: {e}")
+        print(f"[game_activity] ❌ Kritická chyba při ukládání: {e}")
 
 # ═══════════════════════════════════════════════════════════════════════════════
 #                 STATISTICS TRACKING (v2.7.1)
@@ -2058,21 +2142,25 @@ async def load_stats_from_storage():
         print(f"[stats] Error loading stats: {e}")
 
 async def save_stats_to_storage():
-    """Ulož statistiky do bot_data.json (v2.7.1)."""
+    """Ulož statistiky do bot_data.json s validací (v2.7.2)."""
     try:
         db = _load_data()
-        db["stats"] = {
-            "songs_played_total": stats_data["songs_played_total"],
-            "xp_total": stats_data["xp_total"],
-            "game_hours_total": stats_data["game_hours_total"],
-            "weekly_songs_played": stats_data["weekly_songs_played"],
-            "weekly_xp_gained": stats_data["weekly_xp_gained"],
-            "weekly_game_hours": stats_data["weekly_game_hours"],
-            "last_weekly_reset": stats_data["last_weekly_reset"]
+        
+        # Validuj všechny statistiky
+        stats_to_save = {
+            "songs_played_total": max(0, int(stats_data.get("songs_played_total", 0))),
+            "xp_total": max(0, int(stats_data.get("xp_total", 0))),
+            "game_hours_total": max(0.0, float(stats_data.get("game_hours_total", 0))),
+            "weekly_songs_played": max(0, int(stats_data.get("weekly_songs_played", 0))),
+            "weekly_xp_gained": max(0, int(stats_data.get("weekly_xp_gained", 0))),
+            "weekly_game_hours": max(0.0, float(stats_data.get("weekly_game_hours", 0))),
+            "last_weekly_reset": stats_data.get("last_weekly_reset", None)
         }
+        
+        db["stats"] = stats_to_save
         await _save_data(db)
     except Exception as e:
-        print(f"[stats] Error saving stats: {e}")
+        print(f"[stats] ❌ Chyba při ukládání statistik: {e}")
 
 def increment_songs_played():
     """Inkrementuj počet přehraných skladeb (v2.7.1)."""
@@ -2136,19 +2224,39 @@ async def load_user_xp_from_storage():
         print(f"[xp] Failed to load XP: {e}")
 
 async def save_user_xp_to_storage():
-    """Ulož user XP do persistent storage (bot_data.json)."""
+    """Ulož user XP do persistent storage (bot_data.json) s validací (v2.7.2)."""
     try:
         db = _load_data()
         xp_data = {}
+        error_count = 0
+        
         for user_id, data in user_xp.items():
+            xp_value = data.get("xp", 0)
+            
+            # Validuj XP
+            try:
+                xp_value = max(0, int(xp_value))
+            except (ValueError, TypeError):
+                print(f"[xp] ⚠️ Neplatné XP pro user {user_id}: {xp_value}. Resetuji na 0")
+                xp_value = 0
+                error_count += 1
+            
+            level = data.get("level", "🔰 Učedník")
+            if not isinstance(level, str):
+                level = "🔰 Učedník"
+            
             xp_data[str(user_id)] = {
-                "xp": data.get("xp", 0),
-                "level": data.get("level", "🔰 Učedník")
+                "xp": xp_value,
+                "level": level
             }
+        
         db["user_xp"] = xp_data
         await _save_data(db)
+        
+        if error_count > 0:
+            print(f"[xp] ℹ️ Opraveno {error_count} chyb")
     except Exception as e:
-        print(f"[xp] Failed to save XP: {e}")
+        print(f"[xp] ❌ Chyba při ukládání XP: {e}")
 
 @bot.tree.command(name="verse", description="Random biblický verš")
 async def verse_command(interaction: discord.Interaction):
@@ -2671,24 +2779,44 @@ async def config_command(interaction: discord.Interaction):
 
 @tasks.loop(minutes=5)
 async def track_game_activity_periodic():
-    """Měř čas hry každých 5 minut pro všechny online hráče."""
+    """Měř čas hry každých 5 minut pro všechny online hráče (v2.7.2 s error handlingem)."""
     try:
+        error_count = 0
+        success_count = 0
+        
         for guild in bot.guilds:
-            for member in guild.members:
-                if member.bot or member.status != discord.Status.online:
-                    continue
-                
-                # Pokud hraje hru, zaznamenej čas
-                if member.activity and member.activity.type == discord.ActivityType.playing:
-                    track_user_activity(member)
+            try:
+                for member in guild.members:
+                    try:
+                        if member.bot or member.status != discord.Status.online:
+                            continue
+                        
+                        # Pokud hraje hru, zaznamenej čas
+                        if member.activity and member.activity.type == discord.ActivityType.playing:
+                            track_user_activity(member)
+                            success_count += 1
+                    except Exception as e:
+                        error_count += 1
+                        print(f"[track_periodic] ⚠️ Chyba pro {member}: {e}")
+            except Exception as e:
+                print(f"[track_periodic] ⚠️ Chyba v guild {guild.name}: {e}")
         
         # Ulož data do storage po každém updatu
-        await save_game_activity_to_storage()
+        try:
+            await save_game_activity_to_storage()
+        except Exception as e:
+            print(f"[track_periodic] ❌ Chyba při ukládání game_activity: {e}")
         
         # Ulož také XP data (bezpečnost - nechceme ztratit XP pokud se bot spadne)
-        await save_user_xp_to_storage()
+        try:
+            await save_user_xp_to_storage()
+        except Exception as e:
+            print(f"[track_periodic] ❌ Chyba při ukládání user_xp: {e}")
+        
+        if error_count > 0:
+            print(f"[track_periodic] ℹ️ Zpracováno: {success_count} OK, {error_count} chyb")
     except Exception as e:
-        print(f"[track_periodic] Error: {e}")
+        print(f"[track_periodic] ❌ Kritická chyba: {e}")
 
 @track_game_activity_periodic.before_loop
 async def before_track_periodic():
@@ -2922,25 +3050,33 @@ async def clear_recent_announcements():
     global recently_announced_games
     recently_announced_games.clear()
 
-@tasks.loop(hours=168)
+@tasks.loop(minutes=1)
 async def send_weekly_summary():
-    """Pošli týdenní shrnutí aktivit do configured kanálu (v2.7.1)."""
+    """Pošli týdenní shrnutí aktivit do configured kanálu (v2.7.2) – každou neděli v 19:00 CET."""
     global stats_data
     import datetime as dt
     
     try:
-        # Ulož všechny weekly stats PŘED resetem (v2.7.1)
-        weekly_songs = stats_data.get('weekly_songs_played', 0)
-        weekly_xp = stats_data.get('weekly_xp_gained', 0)
-        weekly_hours = stats_data.get('weekly_game_hours', 0)
+        # Kontrola: spusť pouze v neděli v 19:00 CET
+        now_cet = dt.datetime.now(pytz.timezone("Europe/Prague"))
+        # 6 = Sunday, hour = 19, minute = 0
+        if not (now_cet.weekday() == 6 and now_cet.hour == 19 and now_cet.minute == 0):
+            return
         
-        # Týdenní trend (poslední 7 dní)
+        print("[weekly_summary] 🔄 Spouštím týdenní shrnutí...")
+        
+        # ✅ Ulož všechny weekly stats PŘED resetem (ochrana dat)
+        weekly_songs = max(0, stats_data.get('weekly_songs_played', 0))
+        weekly_xp = max(0, stats_data.get('weekly_xp_gained', 0))
+        weekly_hours = max(0.0, stats_data.get('weekly_game_hours', 0.0))
+        
+        # Kontrola: pokud jsou weekly data suspektně nízká, vezmi z game_activity posledních 7 dní
         now = dt.datetime.now(dt.timezone.utc)
         week_ago = now - dt.timedelta(days=7)
         
-        # Sbírá data z poslední týdne
+        # Sbírá data z poslední týdne z game_activity
         weekly_users = {}
-        total_playtime = 0
+        total_playtime_calculated = 0.0
         
         for user_id, game_data in game_activity.items():
             last_update = game_data.get("last_update", now)
@@ -2950,15 +3086,28 @@ async def send_weekly_summary():
                 except:
                     last_update = now
             
+            # Ověř že last_update je bezpečný
+            if not isinstance(last_update, dt.datetime):
+                last_update = now
+            
             if last_update >= week_ago:
                 games = game_data.get("games", {})
-                playtime = sum(hours for hours in games.values() if hours > 0)
-                if playtime > 0:
-                    weekly_users[user_id] = playtime
-                    total_playtime += playtime
+                if isinstance(games, dict):
+                    playtime = sum(float(h) for h in games.values() if isinstance(h, (int, float)) and h > 0)
+                    if playtime > 0:
+                        weekly_users[user_id] = playtime
+                        total_playtime_calculated += playtime
+        
+        # Pokud calculated je vyšší než weekly_hours, vezmi calculated (fallback na real data)
+        if total_playtime_calculated > weekly_hours:
+            print(f"[weekly_summary] ℹ️ Fallback na game_activity data: {weekly_hours:.1f}h → {total_playtime_calculated:.1f}h")
+            weekly_hours = total_playtime_calculated
         
         # Top hráči týdne
         top_weekly = sorted(weekly_users.items(), key=lambda x: x[1], reverse=True)[:5]
+        
+        sent_count = 0
+        error_count = 0
         
         # Pošli do všech serverů do configured blessing channelu
         for guild in bot.guilds:
@@ -2966,18 +3115,20 @@ async def send_weekly_summary():
                 # Najdi blessing channel
                 channel = _get_channel_for_type(guild, "blessing")
                 if not channel:
+                    print(f"[weekly_summary] ⚠️ {guild.name}: Žádný blessing kanál")
                     continue
                 
                 # Build embed
                 embed = discord.Embed(
-                    title="📅 **Týdenní Shrnutí Aktivit – v2.7.1**",
+                    title="📅 **Týdenní Shrnutí Aktivit – v2.7.2**",
                     description=f"Období: {(now - dt.timedelta(days=7)).strftime('%d.%m')} – {now.strftime('%d.%m.%Y')}",
                     color=discord.Color.orange()
                 )
                 
+                # Přidej statistiky
                 embed.add_field(
                     name="⏱️ Čas hrání",
-                    value=f"**{total_playtime:.1f}** h",
+                    value=f"**{weekly_hours:.1f}** h",
                     inline=True
                 )
                 
@@ -3000,23 +3151,43 @@ async def send_weekly_summary():
                         try:
                             user = await bot.fetch_user(user_id)
                             username = user.name
-                        except:
+                        except Exception as e:
                             username = f"User {user_id}"
-                        top_str += f"{idx}. **{username}** – {playtime:.1f}h\n"
-                    embed.add_field(name="🏆 Top hráči týdne", value=top_str, inline=False)
+                            print(f"[weekly_summary] ⚠️ Nemohl jsem fetch user {user_id}: {e}")
+                        
+                        # Ověř že playtime je číslo
+                        if isinstance(playtime, (int, float)) and playtime > 0:
+                            top_str += f"{idx}. **{username}** – {playtime:.1f}h\n"
+                    
+                    if top_str:
+                        embed.add_field(name="🏆 Top hráči týdne", value=top_str, inline=False)
+                    else:
+                        embed.add_field(name="🏆 Top hráči týdne", value="Žádní hráči v datech", inline=False)
+                else:
+                    embed.add_field(name="🏆 Top hráči týdne", value="Žádná data dostupná", inline=False)
                 
-                embed.set_footer(text="v2.7.1 Weekly Summary | Jesus Bot")
+                embed.set_footer(text="v2.7.2 Weekly Summary | Jesus Bot")
+                
                 await channel.send(embed=embed)
+                sent_count += 1
+                print(f"[weekly_summary] ✅ Poslán {guild.name}")
                 
+            except discord.Forbidden:
+                error_count += 1
+                print(f"[weekly_summary] ❌ {guild.name}: Nemám práva na psaní")
             except Exception as e:
-                print(f"[weekly_summary] Error in {guild.name}: {e}")
+                error_count += 1
+                print(f"[weekly_summary] ❌ {guild.name}: {e}")
         
-        # Reset všech weekly stats PO odeslání všech zpráv (v2.7.1)
-        reset_weekly_stats()
-        print(f"[weekly_summary] Reset: songs=0, xp=0, hours=0 | All-time: {stats_data['songs_played_total']} songs, {stats_data['xp_total']} XP, {stats_data['game_hours_total']:.1f}h")
+        # ✅ Reset všech weekly stats PO odeslání všech zpráv (ochrana – jen pokud se podařilo)
+        if sent_count > 0:
+            reset_weekly_stats()
+            print(f"[weekly_summary] ✅ RESET: Odesláno {sent_count}/{len(bot.guilds)} serverů (chyby: {error_count}) | All-time: {stats_data['songs_played_total']} songs, {stats_data['xp_total']} XP, {stats_data['game_hours_total']:.1f}h")
+        else:
+            print(f"[weekly_summary] ⚠️ Žádný server nebyl zpracován!")
     
     except Exception as e:
-        print(f"[weekly_summary] Error: {e}")
+        print(f"[weekly_summary] ❌ KRITICKÁ CHYBA: {e}")
 
 @send_weekly_summary.before_loop
 async def before_weekly_summary():
