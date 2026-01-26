@@ -1455,9 +1455,9 @@ async def leaderboard_command(interaction: discord.Interaction):
             xp_str += f"{idx}. **{username}**\n   ⭐ {xp}XP ({level}) | 🔥 Streak: {streak}\n"
         
         if xp_str:
-            embed_xp.add_field(name="XP Rebrikář", value=xp_str, inline=False)
+            embed_xp.add_field(name="🏆 Žebříček podle XP na serveru", value=xp_str, inline=False)
         else:
-            embed_xp.add_field(name="XP Rebrikář", value="Zatím žádní hráči", inline=False)
+            embed_xp.add_field(name="🏆 Žebříček podle XP na serveru", value="Zatím žádní hráči", inline=False)
         
         embed_xp.set_footer(text="v2.7.2 Leaderboard | Jesus Bot")
         
@@ -1498,9 +1498,9 @@ async def leaderboard_command(interaction: discord.Interaction):
                 hours_str += f"{idx}. **{username}**\n   🎮 {total_hours:.1f}h ({num_games} her)\n"
         
         if hours_str:
-            embed_hours.add_field(name="Časový Rebrikář", value=hours_str, inline=False)
+            embed_hours.add_field(name="⏱️ Žebříček podle času stráveného hraním", value=hours_str, inline=False)
         else:
-            embed_hours.add_field(name="Časový Rebrikář", value="Zatím žádná data", inline=False)
+            embed_hours.add_field(name="⏱️ Žebříček podle času stráveného hraním", value="Zatím žádná data", inline=False)
         
         embed_hours.set_footer(text="v2.7.2 Leaderboard | Jesus Bot")
         
@@ -1521,47 +1521,26 @@ async def leaderboard_command(interaction: discord.Interaction):
 
 @bot.tree.command(name="weeklysummary", description="Týdenní shrnutí aktivit (TOP hráčů, her, eventů)")
 async def weeklysummary_command(interaction: discord.Interaction):
-    """Weekly summary – top players, games, trends (v2.7.2 s error handlingem)."""
+    """Weekly summary – top players, games, trends (v2.7.3 s per-user tracking)."""
     try:
         await interaction.response.defer()
         
-        # Týdenní trend (poslední 7 dní)
         now = datetime.datetime.now()
-        week_ago = now - datetime.timedelta(days=7)
         
-        # Sbírá data z poslední týdne
-        weekly_users = {}
-        total_playtime = 0.0
+        # v2.7.3: Použij weekly_user_hours pro správná týdenní data per-user
+        weekly_users = {uid: hours for uid, hours in weekly_user_hours.items() if hours > 0}
+        total_playtime = stats_data.get('weekly_game_hours', 0.0)
+        weekly_songs = stats_data.get('weekly_songs_played', 0)
+        weekly_xp = stats_data.get('weekly_xp_gained', 0)
         
-        for user_id, game_data in game_activity.items():
-            try:
-                last_update = game_data.get("last_update", now)
-                if isinstance(last_update, str):
-                    try:
-                        last_update = datetime.datetime.fromisoformat(last_update)
-                    except:
-                        last_update = now
-                
-                if not isinstance(last_update, datetime.datetime):
-                    last_update = now
-                
-                if last_update >= week_ago:
-                    games = game_data.get("games", {})
-                    if isinstance(games, dict):
-                        playtime = sum(float(h) for h in games.values() if isinstance(h, (int, float)) and h > 0)
-                        if playtime > 0:
-                            weekly_users[user_id] = playtime
-                            total_playtime += playtime
-            except Exception as e:
-                print(f"[weeklysummary] ⚠️ Chyba při zpracování user {user_id}: {e}")
-                continue
+        print(f"[weeklysummary] 📊 Týdenní data: {total_playtime:.1f}h, {len(weekly_users)} hráčů, {weekly_songs} skladeb, {weekly_xp} XP")
         
-        # Top hráči týdne
+        # Top hráči týdne (seřazeno podle skutečných týdenních hodin)
         top_weekly = sorted(weekly_users.items(), key=lambda x: x[1], reverse=True)[:5]
         
         # Build embed
         embed = discord.Embed(
-            title="📅 **Týdenní Shrnutí – v2.7.2**",
+            title="📅 **Týdenní Shrnutí – v2.7.3**",
             description=f"Období: {(now - datetime.timedelta(days=7)).strftime('%d.%m')} – {now.strftime('%d.%m.%Y')}",
             color=discord.Color.orange()
         )
@@ -1575,6 +1554,12 @@ async def weeklysummary_command(interaction: discord.Interaction):
         embed.add_field(
             name="👥 Aktivní hráči",
             value=f"**{len(weekly_users)}** hráčů",
+            inline=True
+        )
+        
+        embed.add_field(
+            name="🎵 Skladby / ⭐ XP",
+            value=f"**{weekly_songs}** skladeb\n**{weekly_xp:,}** XP",
             inline=True
         )
         
@@ -1599,7 +1584,7 @@ async def weeklysummary_command(interaction: discord.Interaction):
         else:
             embed.add_field(name="🏆 Top hráči týdne", value="Žádná data dostupná", inline=False)
         
-        embed.set_footer(text="v2.7.2 Weekly Summary | Jesus Bot")
+        embed.set_footer(text="v2.7.3 Weekly Summary | Jesus Bot")
         await interaction.followup.send(embed=embed)
         print(f"[weeklysummary] ✅ Weekly summary odeslán pro {interaction.user.name}")
         
@@ -2124,9 +2109,12 @@ stats_data = {
     "last_weekly_reset": None       # Čas posledního resetu weekly stats
 }
 
+# Týdenní hodiny per-user (pro žebříček) - resetuje se každý týden
+weekly_user_hours: dict[int, float] = {}
+
 async def load_stats_from_storage():
     """Načti statistiky z bot_data.json (v2.7.1)."""
-    global stats_data
+    global stats_data, weekly_user_hours
     try:
         db = _load_data()
         stats = db.get("stats", {})
@@ -2137,12 +2125,17 @@ async def load_stats_from_storage():
         stats_data["weekly_xp_gained"] = stats.get("weekly_xp_gained", 0)
         stats_data["weekly_game_hours"] = stats.get("weekly_game_hours", 0)
         stats_data["last_weekly_reset"] = stats.get("last_weekly_reset", None)
-        print(f"[stats] Loaded: {stats_data['songs_played_total']} songs, {stats_data['xp_total']} total XP, {stats_data['game_hours_total']:.1f}h games")
+        
+        # Načti weekly_user_hours (v2.7.3)
+        saved_weekly_users = db.get("weekly_user_hours", {})
+        weekly_user_hours = {int(uid): float(hours) for uid, hours in saved_weekly_users.items()}
+        
+        print(f"[stats] Loaded: {stats_data['songs_played_total']} songs, {stats_data['xp_total']} total XP, {stats_data['game_hours_total']:.1f}h games, {len(weekly_user_hours)} weekly users")
     except Exception as e:
         print(f"[stats] Error loading stats: {e}")
 
 async def save_stats_to_storage():
-    """Ulož statistiky do bot_data.json s validací (v2.7.2)."""
+    """Ulož statistiky do bot_data.json s validací (v2.7.3)."""
     try:
         db = _load_data()
         
@@ -2158,6 +2151,10 @@ async def save_stats_to_storage():
         }
         
         db["stats"] = stats_to_save
+        
+        # Ulož weekly_user_hours (v2.7.3)
+        db["weekly_user_hours"] = {str(uid): hours for uid, hours in weekly_user_hours.items()}
+        
         await _save_data(db)
     except Exception as e:
         print(f"[stats] ❌ Chyba při ukládání statistik: {e}")
@@ -2183,24 +2180,35 @@ def increment_xp_stats(xp_amount: int):
     except RuntimeError:
         pass
 
-def increment_game_hours(hours: float):
-    """Inkrementuj hodiny her (v2.7.1)."""
-    global stats_data
+def increment_game_hours(hours: float, user_id: int = None):
+    """Inkrementuj hodiny her (v2.7.3 - per-user tracking)."""
+    global stats_data, weekly_user_hours
     stats_data["game_hours_total"] += hours
     stats_data["weekly_game_hours"] += hours
+    
+    # Přidej per-user weekly tracking (v2.7.3)
+    if user_id is not None:
+        if user_id not in weekly_user_hours:
+            weekly_user_hours[user_id] = 0.0
+        weekly_user_hours[user_id] += hours
+    
     try:
         asyncio.create_task(save_stats_to_storage())
     except RuntimeError:
         pass
 
 def reset_weekly_stats():
-    """Resetuj všechny weekly stats po týdnu (v2.7.1)."""
-    global stats_data
+    """Resetuj všechny weekly stats po týdnu (v2.7.3 - per-user tracking)."""
+    global stats_data, weekly_user_hours
     import datetime
     stats_data["weekly_songs_played"] = 0
     stats_data["weekly_xp_gained"] = 0
     stats_data["weekly_game_hours"] = 0
     stats_data["last_weekly_reset"] = datetime.datetime.now(datetime.timezone.utc).isoformat()
+    
+    # Reset per-user weekly hours (v2.7.3)
+    weekly_user_hours.clear()
+    
     try:
         asyncio.create_task(save_stats_to_storage())
     except RuntimeError:
@@ -3052,8 +3060,8 @@ async def clear_recent_announcements():
 
 @tasks.loop(minutes=1)
 async def send_weekly_summary():
-    """Pošli týdenní shrnutí aktivit do configured kanálu (v2.7.2) – každou neděli v 19:00 CET."""
-    global stats_data
+    """Pošli týdenní shrnutí aktivit do configured kanálu (v2.7.3) – každou neděli v 19:00 CET."""
+    global stats_data, weekly_user_hours
     import datetime as dt
     
     try:
@@ -3070,40 +3078,15 @@ async def send_weekly_summary():
         weekly_xp = max(0, stats_data.get('weekly_xp_gained', 0))
         weekly_hours = max(0.0, stats_data.get('weekly_game_hours', 0.0))
         
-        # Kontrola: pokud jsou weekly data suspektně nízká, vezmi z game_activity posledních 7 dní
         now = dt.datetime.now(dt.timezone.utc)
-        week_ago = now - dt.timedelta(days=7)
         
-        # Sbírá data z poslední týdne z game_activity
-        weekly_users = {}
-        total_playtime_calculated = 0.0
+        # v2.7.3: Použij weekly_user_hours pro správná týdenní data per-user
+        # Tato data se sbírají průběžně během týdne a resetují se po odeslání
+        weekly_users = {uid: hours for uid, hours in weekly_user_hours.items() if hours > 0}
         
-        for user_id, game_data in game_activity.items():
-            last_update = game_data.get("last_update", now)
-            if isinstance(last_update, str):
-                try:
-                    last_update = dt.datetime.fromisoformat(last_update)
-                except:
-                    last_update = now
-            
-            # Ověř že last_update je bezpečný
-            if not isinstance(last_update, dt.datetime):
-                last_update = now
-            
-            if last_update >= week_ago:
-                games = game_data.get("games", {})
-                if isinstance(games, dict):
-                    playtime = sum(float(h) for h in games.values() if isinstance(h, (int, float)) and h > 0)
-                    if playtime > 0:
-                        weekly_users[user_id] = playtime
-                        total_playtime_calculated += playtime
+        print(f"[weekly_summary] 📊 Týdenní data: {weekly_hours:.1f}h celkem, {len(weekly_users)} aktivních hráčů")
         
-        # Pokud calculated je vyšší než weekly_hours, vezmi calculated (fallback na real data)
-        if total_playtime_calculated > weekly_hours:
-            print(f"[weekly_summary] ℹ️ Fallback na game_activity data: {weekly_hours:.1f}h → {total_playtime_calculated:.1f}h")
-            weekly_hours = total_playtime_calculated
-        
-        # Top hráči týdne
+        # Top hráči týdne (seřazeno podle skutečných týdenních hodin)
         top_weekly = sorted(weekly_users.items(), key=lambda x: x[1], reverse=True)[:5]
         
         sent_count = 0
@@ -3166,7 +3149,7 @@ async def send_weekly_summary():
                 else:
                     embed.add_field(name="🏆 Top hráči týdne", value="Žádná data dostupná", inline=False)
                 
-                embed.set_footer(text="v2.7.2 Weekly Summary | Jesus Bot")
+                embed.set_footer(text="v2.7.3 Weekly Summary | Jesus Bot")
                 
                 await channel.send(embed=embed)
                 sent_count += 1
@@ -3887,8 +3870,8 @@ def track_user_activity(member: discord.Member, reset_on_new_game: bool = False)
         time_delta = (now - last_update).total_seconds() / 3600
         user_data["games"][game_name] += time_delta
         
-        # Inkrementuj weekly game hours (v2.7.1)
-        increment_game_hours(time_delta)
+        # Inkrementuj weekly game hours s per-user tracking (v2.7.3)
+        increment_game_hours(time_delta, member.id)
     
     # Aktualizuj last_update na teď (bez ohledu na reset_on_new_game)
     user_data["last_update"] = now
