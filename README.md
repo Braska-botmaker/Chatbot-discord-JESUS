@@ -1,6 +1,6 @@
 # ✝️ Ježíš Discord Bot – hudba, verše a hry zdarma 🙏
 
-**Verze:** v2.7.1 – Server Analytics & Summary (Improved) | **Platform:** Raspberry Pi Ready
+**Verze:** v2.8 – Spotify Integration Pack | **Platform:** Raspberry Pi Ready
 
 Discord bot napsaný v Pythonu (discord.py), který umí:
 
@@ -136,7 +136,12 @@ V kořeni projektu vytvořte soubor `.env`:
 
 ```env
 DISCORD_TOKEN=PASTE_VAS_TOKEN_SEM
+SPOTIFY_CLIENT_ID=PASTE_SPOTIFY_CLIENT_ID
+SPOTIFY_CLIENT_SECRET=PASTE_SPOTIFY_CLIENT_SECRET
+SPOTIFY_REDIRECT_URI=http://localhost:8888/callback
 ```
+
+> Pozn.: `SPOTIFY_REDIRECT_URI` musí být uvedena i v Spotify Developer Dashboardu.
 
 > Token nikdy necommituje do repozitáře.
 
@@ -176,6 +181,10 @@ Hezký přehled najdete v `/commands`. Základ:
 ### Hudba
 
 * `/yt <url>` – přidá skladbu nebo playlist do fronty a spustí přehrávání (YouTube přes yt-dlp) - **+1-2 XP**
+* `/spauth` – Spotify OAuth přihlášení (nutné pro `/sp`)
+* `/spcode <url>` – dokončení Spotify OAuth (vložíš redirect URL)
+* `/sp <spotify_url>` – přidá Spotify skladbu/playlist do fronty (Spotify Connect)
+* Pozn.: Spotify Connect vyžaduje Spotify Premium
 * `/skip` – přeskoči aktuální skladbu - **+1-2 XP**
 * `/pause` / `/resume` – pauza/obnovení
 * `/stop` – zastaví a vyčistí frontu
@@ -441,7 +450,7 @@ Správa konfigurace per-guild:
 * ✅ **Message když Steam nemá hry zdarma** – Zobrazí "❌ Steam" když je Steam prázdný
 * 📍 *Upozornění na končící hry* – Základ implementován, volno pro rozšíření (API nevrací expiration data)
 
-### 🟨 v2.7 – Server Analytics & Summary (PLÁNOVANÉ)
+### 🟩 v2.7 – Server Analytics & Summary (AKTIVNÍ)
 
 * `/serverstats` – přehled aktivit, hudby, miniher
 * Leaderboard hráčů
@@ -449,7 +458,7 @@ Správa konfigurace per-guild:
 * Týdenní shrnutí aktivit
 * Agregace hraných her + hudební historie
 
-### 🟨 v2.8 – Spotify Integration Pack (PLÁNOVANÉ)
+### 🟩 v2.8 – Spotify Integration Pack (HOTOVO)
 
 * **Spotify Web API support** – `/sp <spotify_url>` přidá skladbu nebo playlist do fronty
 * **Spotify Connect playback** – Bot ovládá tvou Spotify aplikaci přes Spotify Connect (legitimní streaming)

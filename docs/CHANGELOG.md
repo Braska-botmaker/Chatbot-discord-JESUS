@@ -4,6 +4,20 @@ Všechny změny v tomto projektu jsou zaznamenány v tomto souboru.
 
 ---
 
+## [v2.8] – 2026-02-15
+
+### ✨ Nové funkce
+
+- **Spotify Web API support** – `/sp <spotify_url>` přidá skladbu nebo playlist do fronty
+- **Spotify Connect playback** – Bot ovládá tvou Spotify aplikaci přes Spotify Connect (legitimní streaming)
+- **Premium account required** – Vyžaduje Spotify Premium pro programmatic playback
+- **OAuth authentication** – Uživatel se autentifikuje přes Spotify OAuth na začátku
+- **Duplikát blocking** – Spotify skladby jsou chráněny proti duplicitám jako YouTube
+- **Queue duration estimation** – Odhad času i pro Spotify skladby
+- **Error handling** – Bez vlivu na YouTube přehrávání (`/yt`), oddělené systémy
+
+---
+
 ## [v2.7.1] – 2026-01-04
 
 ### ✨ Nové funkce
