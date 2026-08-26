@@ -166,14 +166,13 @@ echo   Způsob 2 (okno):
 echo     Dvakrát klikni na: run.bat (pokud existuje)
 echo.
 echo 📝 Testuj v Discordu:
-echo   !commands      # Seznam příkazů
-echo   !diag          # Diagnostika
-echo   !verš          # Náhodný verš
+echo   /commands      # Seznam příkazů
+echo   /diag          # Diagnostika
+echo   /verse         # Náhodný verš
 echo.
 echo 📚 Dokumentace:
-echo   docs\INSTALACE.md  – Podrobný guide
-echo   docs\CHYBY.md      – Troubleshooting
-echo   docs\RYCHLY_START.md – Rychlý start
+echo   docs\INSTALL.md         – Instalace a nastavení
+echo   docs\TROUBLESHOOTING.md – Řešení problémů
 echo.
 echo 🥧 Raspberry Pi?
 echo   Spusť na RPi: bash install.sh

@@ -40,6 +40,20 @@ s voice spojením. Obojí ověřeno živě na produkčním Raspberry Pi, ne jen 
 - Po tomto patchi je na produkčním Pi nutné (mimo obvyklé `bot.py` přes deploy hook):
   `pip install -U "discord.py[voice]"` ve venv + restart služby.
 
+### 📚 Dokumentace – kompletní přehled
+
+Dokumentace byla rozrostlá do 6+ vzájemně se překrývajících a částečně zastaralých
+souborů (README.md, `ČTĚME_NEJDŘÍV.md`, `QUICK_START.md`, `RYCHLY_START.md`,
+`INSTALACE.md`, `CHYBY.md` – některé odkazovaly na neexistující soubory a staré
+prefixové příkazy jako `!play`). Sjednoceno do jasné struktury:
+
+- **README.md** – přepsáno: stručný přehled, příkazy jako tabulky, odkazy dál
+- **docs/INSTALL.md** (nový) – nahrazuje `INSTALACE.md` + `RYCHLY_START.md` (desktop i produkce v jednom místě)
+- **docs/TROUBLESHOOTING.md** (nový) – nahrazuje `CHYBY.md`, doplněno o 4017/DAVE a aktuální yt-dlp guidance
+- **docs/FREE_GAMES.md** – opraveno (rozbité odkazy, poškozené znaky, zastaralé zdroje)
+- Odstraněno: `ČTĚME_NEJDŘÍV.md`, `QUICK_START.md`, `RYCHLY_START.md`, `INSTALACE.md`, `CHYBY.md`
+- Aktualizovány odkazy v `scripts/install*.{sh,bat}` na nové soubory a slash příkazy
+
 ---
 
 ## [v2.8.1-beta] – 2026-08-26 – Music Fix Pack
