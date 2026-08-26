@@ -4,6 +4,44 @@ Všechny změny v tomto projektu jsou zaznamenány v tomto souboru.
 
 ---
 
+## [v2.8.2] – 2026-08-26 – Voice & Player Client Hotfix
+
+Přímé pokračování v2.8.1-beta – po nasazení na produkční Pi se ukázalo, že v2.8.1 hudbu
+opravilo jen částečně (viz níže) a navíc odhalilo samostatný, staršího data problém
+s voice spojením. Obojí ověřeno živě na produkčním Raspberry Pi, ne jen teoreticky.
+
+### 🐛 Bugfix – yt-dlp vynucené player klienty teď škodí, ne pomáhají
+
+- V2.8.1 přidalo vynucené `player_client: android_vr,web_safari,tv`, aby se obešla
+  nutnost PO tokenu. Na produkci se ale ukázalo, že YouTube tuhle konkrétní kombinaci
+  mezitím omezil: `yt-dlp` extrakce nahlásí úspěch a vrátí URL, ale stažení z něj skončí
+  **HTTP 403 Forbidden** – ověřeno i přímo přes `yt-dlp` vlastní downloader (ne jen
+  přes ffmpeg), takže to není otázka chybějících HTTP hlaviček. Bot proto píseň
+  "přehraje" na 0 sekund a hned přeskočí na další.
+- Default `YTDLP_PLAYER_CLIENTS` je teď **prázdný** – necháme volbu klienta na `yt-dlp`
+  samotném, který si aktuálně (2025.06+) poradí spolehlivěji než naše vynucené přepsání.
+  Env klíč zůstává jako nouzová záloha pro budoucí regrese.
+
+### 🐛 Bugfix – voice spojení padalo s kódem 4017 ještě před yt-dlp
+
+- Nezávisle na hudbě: bot se vůbec nedokázal připojit do voice kanálu –
+  `WebSocket closed with 4017` opakovaně při handshake, dřív než se stihla spustit
+  jakákoliv extrakce. RPi patch pro kód 4006 na tohle nereagoval (jiný kód).
+- Příčina: Discord od produkčního nasazení vyžaduje pro voice spojení podporu DAVE
+  (End-to-End Encrypted Voice) protokolu. `discord.py 2.6.4` ho neuměl vůbec –
+  proto server spojení zabíjel nedokumentovaným kódem 4017.
+- **Fix:** upgrade na `discord.py>=2.7.1` (podporuje DAVE) + instalace nové povinné
+  závislosti `davey` (`pip install -U "discord.py[voice]"`, což zároveň srovná
+  `PyNaCl` na `<1.6,>=1.5.0`, jak `davey` vyžaduje). Prebuilt wheely jsou na piwheels
+  i pro ARM, žádná kompilace na Pi není potřeba.
+
+### ⚙️ Nasazení
+
+- Po tomto patchi je na produkčním Pi nutné (mimo obvyklé `bot.py` přes deploy hook):
+  `pip install -U "discord.py[voice]"` ve venv + restart služby.
+
+---
+
 ## [v2.8.1-beta] – 2026-08-26 – Music Fix Pack
 
 Kompletní code review `bot.py` po hlášení, že přestalo fungovat přehrávání hudby z YouTube.

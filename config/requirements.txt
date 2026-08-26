@@ -2,7 +2,10 @@
 # Instalace: pip install -r requirements.txt
 
 # Core
-discord.py>=2.0.0
+# DŮLEŽITÉ (v2.8.2): Discord vyžaduje pro voice DAVE (E2EE) protokol, který podporuje
+# až discord.py>=2.7.1. Extra "[voice]" doinstaluje i povinnou závislost `davey` a
+# správnou verzi PyNaCl (<1.6) – bez toho voice spojení padá s WebSocket kódem 4017.
+discord.py[voice]>=2.7.1
 python-dotenv>=0.19.0
 
 # YouTube a přehrávání
@@ -10,9 +13,6 @@ python-dotenv>=0.19.0
 # fungovat (ticho, "Sign in to confirm you're not a bot", HTTP 403...).
 # Pravidelně aktualizuj: pip install -U yt-dlp
 yt-dlp>=2025.06.09
-
-# Voice + audio
-PyNaCl>=1.5.0
 
 # HTTP a timezone
 requests>=2.28.0

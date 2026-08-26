@@ -1,5 +1,5 @@
 # ╔════════════════════════════════════════════════════════════════════════════╗
-# ║  Ježíš Discord Bot v2.8.1-beta – Music Fix Pack                            ║
+# ║  Ježíš Discord Bot v2.8.2 – Voice & Player Client Hotfix                   ║
 # ║                     Kompletní přepis na slash commands                     ║
 # ╚════════════════════════════════════════════════════════════════════════════╝
 
@@ -336,8 +336,15 @@ song_durations = {}  # {song_url: duration_seconds} – v2.4 odhad času
 # které nepotřebují PO token (jinak hrozí "Sign in to confirm you're not a bot" / HTTP 403,
 # nebo yt-dlp vrátí neplatný non-audio stream). Seznam klientů se čas od času mění podle
 # toho, jak YouTube utahuje ochrany – proto je nastavitelný přes .env bez zásahu do kódu.
+#
+# v2.8.2 FIX: vynucené "android_vr,web_safari,tv" přestalo fungovat úplně (YouTube tyto
+# klienty mezitím omezil – yt-dlp extrakce "uspěje", ale vrácené URL dá při stahování
+# HTTP 403, ověřeno i přímo přes yt-dlp downloader, ne jen ffmpeg). Aktuální yt-dlp
+# (2025.06+) si player klienty vybírá spolehlivě sám, takže default je teď prázdný
+# (= necháme volbu na yt-dlp) a přepsání přes YTDLP_PLAYER_CLIENTS je jen nouzová záloha,
+# kdyby YouTube zase něco změnil.
 YTDLP_PLAYER_CLIENTS = [
-    c.strip() for c in os.getenv("YTDLP_PLAYER_CLIENTS", "android_vr,web_safari,tv").split(",") if c.strip()
+    c.strip() for c in os.getenv("YTDLP_PLAYER_CLIENTS", "").split(",") if c.strip()
 ]
 # Volitelný cookies.txt (Netscape formát) pro věkově omezená/přísněji blokovaná videa.
 YTDLP_COOKIES_FILE = os.getenv("YTDLP_COOKIES_FILE", "").strip()
@@ -353,12 +360,11 @@ YDL_OPTS = {
     "http_headers": {
         "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"
     },
-    "extractor_args": {
-        "youtube": {
-            "player_client": YTDLP_PLAYER_CLIENTS,
-        }
-    },
 }
+# Jen když admin výslovně nastaví YTDLP_PLAYER_CLIENTS v .env, přepiš volbu klienta –
+# jinak necháme yt-dlp, ať si vybere sám (viz komentář výše, proč je to teď default).
+if YTDLP_PLAYER_CLIENTS:
+    YDL_OPTS["extractor_args"] = {"youtube": {"player_client": YTDLP_PLAYER_CLIENTS}}
 if YTDLP_COOKIES_FILE:
     if pathlib.Path(YTDLP_COOKIES_FILE).exists():
         YDL_OPTS["cookiefile"] = YTDLP_COOKIES_FILE
@@ -2542,14 +2548,14 @@ async def version_command(interaction: discord.Interaction):
     """Show bot version and changelog."""
     try:
         embed = discord.Embed(
-            title="ℹ️ Ježíš Discord Bot – v2.8.1-beta",
-            description="Music Fix Pack",
+            title="ℹ️ Ježíš Discord Bot – v2.8.2",
+            description="Voice & Player Client Hotfix",
             color=discord.Color.gold()
         )
 
         embed.add_field(
             name="⏱️ Version",
-            value="v2.8.1-beta\nMusic Fix Pack",
+            value="v2.8.2\nVoice & Player Client Hotfix",
             inline=True
         )
 
@@ -2594,10 +2600,10 @@ async def version_command(interaction: discord.Interaction):
         )
 
         embed.add_field(
-            name="🔧 v2.8.1 Bugfixy (NEW)",
-            value="""🎥 YouTube extrakce opravena (PO token/SABR)
+            name="🔧 v2.8.2 Bugfixy (NEW)",
+            value="""🔊 Voice spojení opraveno (DAVE/discord.py 2.7.1)
+🎥 yt-dlp player klienti – zpět na auto-výběr
 ⚡ Přehrávání už neblokuje celého bota
-🔊 `/voicetest` opraven (reálný 440Hz tón)
 🩺 `/diag` – živý yt-dlp self-test""",
             inline=True
         )
@@ -2768,7 +2774,7 @@ async def diag_command(interaction: discord.Interaction):
     voice_count = len(bot.voice_clients)
     embed.add_field(name="🎤 Voice", value=f"Connected: {voice_count}", inline=True)
     if bot.user:
-        embed.add_field(name="⏱️ Version", value="v2.8.1-beta\nMusic Fix Pack", inline=True)
+        embed.add_field(name="⏱️ Version", value="v2.8.2\nVoice & Player Client Hotfix", inline=True)
 
     # v2.8.1: Živý test yt-dlp/YouTube extrakce – nejrychlejší způsob, jak zjistit
     # jestli je problém v zastaralém yt-dlp, nebo jinde.
