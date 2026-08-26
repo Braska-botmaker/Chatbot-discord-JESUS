@@ -69,7 +69,7 @@ Bot je přihlášen jako Ježíš#4405
 /verse          # Náhodný verš
 /yt https://www.youtube.com/watch?v=dQw4w9WgXcQ
 /serverstats    # Server Analytics (v2.7)
-/myactivity     # Tvůj profil (v2.7)
+/profile        # Tvůj profil (v2.7)
 /leaderboard    # Leaderboard (v2.7)
 ```
 

@@ -130,7 +130,7 @@ Bot je přihlášen jako Ježíš#4405
 **Testuj v Discordu:**
 ```
 !verš
-!diag
+/diag
 !commands
 ```
 
@@ -275,8 +275,8 @@ ls -la /opt/discordbot/
 
 ```bash
 # Spusť diagnostiku v Discordu
-!diag
-!vtest
+/diag
+/voicetest
 
 # Logy s filtrem
 sudo journalctl -u discordbot -f | grep -i "4006\|voice\|timeout"
@@ -367,9 +367,9 @@ V Discordu spusť:
 
 ```
 !commands       # Seznam příkazů
-!diag           # Diagnostika RPi (Python, PyNaCl, Opus, FFmpeg)
+/diag           # Diagnostika RPi (Python, PyNaCl, Opus, FFmpeg)
 !verš           # Náhodný verš
-!play https://www.youtube.com/watch?v=dQw4w9WgXcQ
+/yt https://www.youtube.com/watch?v=dQw4w9WgXcQ
 ```
 
 Pokud vše funguje → Bot je připravený! 🎉

@@ -34,9 +34,9 @@ sudo systemctl start discordbot
 
 ### 5. Test
 Zkontroluj že funguje:
-- `!vtest` – test voice connectivity
-- `!play <YouTube URL>` – test hudby
-- `!diag` – kontrola všech komponent
+- `/voicetest` – test voice connectivity
+- `/yt <YouTube URL>` – test hudby
+- `/diag` – kontrola všech komponent
 
 ---
 
@@ -44,7 +44,7 @@ Zkontroluj že funguje:
 
 ✅ **Server Analytics** – `/serverstats` pro přehled aktivit na serveru  
 ✅ **Leaderboards** – `/leaderboard` s top 10 hráči podle XP  
-✅ **Osobní profil** – `/myactivity` s tvou statistikou a dosaženími  
+✅ **Osobní profil** – `/profile` s tvou statistikou a dosaženími  
 ✅ **Týdenní trend** – `/weeklysummary` s analýzou poslední týdne  
 ✅ **Agregovaná data** – Sledování her, hudby, XP a verse streaku  
 ✅ **Anti-cheat** – Ochrana proti falšování dat v analytics  

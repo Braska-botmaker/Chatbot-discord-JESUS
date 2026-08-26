@@ -1,5 +1,5 @@
 # ╔════════════════════════════════════════════════════════════════════════════╗
-# ║  Ježíš Discord Bot v2.8 – Spotify Integration Pack                         ║
+# ║  Ježíš Discord Bot v2.8.1-beta – Music Fix Pack                            ║
 # ║                     Kompletní přepis na slash commands                     ║
 # ╚════════════════════════════════════════════════════════════════════════════╝
 
@@ -14,8 +14,6 @@ import random
 import datetime
 import os
 import requests
-import base64
-from urllib.parse import urlencode, urlparse, parse_qs
 from dotenv import load_dotenv
 import pytz
 import asyncio
@@ -148,10 +146,8 @@ _patch_voice_connect_for_rpi()
 
 load_dotenv()
 TOKEN = os.getenv("DISCORD_TOKEN")
-SPOTIFY_CLIENT_ID = os.getenv("SPOTIFY_CLIENT_ID")
-SPOTIFY_CLIENT_SECRET = os.getenv("SPOTIFY_CLIENT_SECRET")
-SPOTIFY_REDIRECT_URI = os.getenv("SPOTIFY_REDIRECT_URI", "http://localhost:8888/callback")
-SPOTIFY_SCOPES = "user-read-playback-state user-modify-playback-state playlist-read-private playlist-read-collaborative"
+# Spotify integrace byla z v2.8.1-beta dočasně odebrána (odloženo na pozdější verzi,
+# viz docs/CHANGELOG.md) – kód najdeš v historii gitu, pokud ji budeš chtít vrátit.
 
 intents = discord.Intents.default()
 intents.message_content = True
@@ -180,7 +176,7 @@ def _load_data():
             data_text = DATA_FILE.read_text(encoding="utf-8")
             data = json.loads(data_text)
             # Validace: ověř že existují hlavní klíče
-            required_keys = ["verse_streak", "game_activity", "user_xp", "stats", "spotify"]
+            required_keys = ["verse_streak", "game_activity", "user_xp", "stats"]
             for key in required_keys:
                 if key not in data:
                     data[key] = {}
@@ -198,7 +194,7 @@ def _load_data():
     except Exception as e:
         print(f"[DATA] ❌ Chyba při čtení dat: {e}")
     
-    return {"verse_streak": {}, "game_activity": {}, "user_xp": {}, "stats": {}, "spotify": {}}
+    return {"verse_streak": {}, "game_activity": {}, "user_xp": {}, "stats": {}}
 
 async def _save_data(db):
     """Ulož data s automatickým backupem (ochrana dat)."""
@@ -335,8 +331,16 @@ recently_announced_games = set()
 voice_inactivity_timers = {}  # {guild_id: asyncio.Task}
 queue_urls_seen = {}  # {guild_id: set(urls)} – v2.4 blokace duplicit
 song_durations = {}  # {song_url: duration_seconds} – v2.4 odhad času
-spotify_queues = {}  # {user_id: deque} – v2.8 Spotify fronta
-spotify_auth_states = {}  # {user_id: state} – OAuth CSRF ochrana
+
+# v2.8.1: YouTube od 2024/2025 vyžaduje pro spolehlivou extrakci vybrat "player klienty",
+# které nepotřebují PO token (jinak hrozí "Sign in to confirm you're not a bot" / HTTP 403,
+# nebo yt-dlp vrátí neplatný non-audio stream). Seznam klientů se čas od času mění podle
+# toho, jak YouTube utahuje ochrany – proto je nastavitelný přes .env bez zásahu do kódu.
+YTDLP_PLAYER_CLIENTS = [
+    c.strip() for c in os.getenv("YTDLP_PLAYER_CLIENTS", "android_vr,web_safari,tv").split(",") if c.strip()
+]
+# Volitelný cookies.txt (Netscape formát) pro věkově omezená/přísněji blokovaná videa.
+YTDLP_COOKIES_FILE = os.getenv("YTDLP_COOKIES_FILE", "").strip()
 
 YDL_OPTS = {
     "format": "bestaudio/best",
@@ -348,8 +352,19 @@ YDL_OPTS = {
     "socket_timeout": 30,
     "http_headers": {
         "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"
-    }
+    },
+    "extractor_args": {
+        "youtube": {
+            "player_client": YTDLP_PLAYER_CLIENTS,
+        }
+    },
 }
+if YTDLP_COOKIES_FILE:
+    if pathlib.Path(YTDLP_COOKIES_FILE).exists():
+        YDL_OPTS["cookiefile"] = YTDLP_COOKIES_FILE
+        print(f"[yt-dlp] Používám cookies soubor: {YTDLP_COOKIES_FILE}")
+    else:
+        print(f"[yt-dlp] ⚠️ YTDLP_COOKIES_FILE je nastaveno, ale soubor neexistuje: {YTDLP_COOKIES_FILE}")
 
 FFMPEG_RECONNECT = "-reconnect 1 -reconnect_streamed 1 -reconnect_delay_max 5 -rw_timeout 5000000 -nostdin"
 FFMPEG_OPTIONS = "-vn -ac 1 -b:a 128k -bufsize 256k"
@@ -376,10 +391,15 @@ def make_before_options(headers_str: str) -> str:
     return f'{FFMPEG_RECONNECT} -headers "{safe}"'
 
 def ytdlp_extract(url: str):
-    """Extrahuj URL a headery z YouTube/stream. Retry na timeout."""
+    """Extrahuj URL a headery z YouTube/stream. Retry na timeout.
+
+    POZOR: Toto je BLOKUJÍCÍ (synchronní) síťová operace – volej vždy přes
+    `await asyncio.to_thread(ytdlp_extract, url)`, nikdy přímo z async funkce,
+    jinak se zasekne celý bot (event loop) na všech serverech najednou.
+    """
     max_retries = 2
     last_err = None
-    
+
     for attempt in range(max_retries):
         try:
             with _yt_dlp.YoutubeDL(YDL_OPTS) as ydl:
@@ -388,15 +408,25 @@ def ytdlp_extract(url: str):
                     if not info["entries"]:
                         raise ValueError("Playlist je prázdný nebo žádné videa")
                     info = info["entries"][0]
-                
+
                 if not info.get("url"):
                     raise ValueError("Žádné audio URL v odpovědi yt-dlp")
-                
+
+                # v2.8.1: Ochrana proti staré/nekompatibilní verzi yt-dlp, která na dnešním
+                # YouTube občas nevrátí chybu, ale místo audia potichu vybere neplatný
+                # stream (např. "mhtml" storyboard náhledy bez zvuku).
+                if info.get("ext") == "mhtml" or info.get("acodec") in (None, "none"):
+                    raise ValueError(
+                        "yt-dlp vrátil stream bez zvuku (pravděpodobně zastaralá verze yt-dlp). "
+                        "Zkus: pip install -U yt-dlp"
+                    )
+
                 return {
                     "title": info.get("title", "Unknown"),
                     "url": info["url"],
                     "webpage_url": info.get("webpage_url") or url,
                     "headers": _headers_str_from_info(info),
+                    "duration": info.get("duration") or 180,
                 }
         except Exception as e:
             last_err = e
@@ -404,7 +434,7 @@ def ytdlp_extract(url: str):
                 print(f"[yt-dlp extract attempt {attempt+1}] {type(e).__name__}: {e}")
                 time.sleep(1)
             continue
-    
+
     raise last_err
 
 def _queue_for(guild_id: int) -> deque:
@@ -457,232 +487,6 @@ def _estimate_queue_duration(guild_id: int) -> tuple:
     remaining_seconds = total_seconds % 60
     return (total_minutes, remaining_seconds, len(queue))
 
-def _spotify_queue_for(user_id: int) -> deque:
-    if user_id not in spotify_queues:
-        spotify_queues[user_id] = deque()
-    return spotify_queues[user_id]
-
-def _spotify_is_uri_in_queue(user_id: int, uri: str) -> bool:
-    queue = _spotify_queue_for(user_id)
-    return any(item.get("uri") == uri for item in queue)
-
-def _estimate_spotify_queue_duration(user_id: int) -> tuple:
-    queue = _spotify_queue_for(user_id)
-    total_ms = 0
-    for item in queue:
-        total_ms += int(item.get("duration_ms", 180000))
-    total_seconds = total_ms // 1000
-    total_minutes = total_seconds // 60
-    remaining_seconds = total_seconds % 60
-    return (total_minutes, remaining_seconds, len(queue))
-
-def _spotify_store_users(db: dict) -> dict:
-    store = db.get("spotify")
-    if not isinstance(store, dict):
-        store = {}
-        db["spotify"] = store
-    users = store.get("users")
-    if not isinstance(users, dict):
-        users = {}
-        store["users"] = users
-    return users
-
-def _spotify_get_user_record(db: dict, user_id: int) -> Optional[dict]:
-    users = _spotify_store_users(db)
-    return users.get(str(user_id))
-
-def _spotify_save_user_record(db: dict, user_id: int, record: dict):
-    users = _spotify_store_users(db)
-    users[str(user_id)] = record
-
-def _spotify_make_auth_url(user_id: int) -> str:
-    if not SPOTIFY_CLIENT_ID or not SPOTIFY_REDIRECT_URI:
-        return ""
-    state = f"{user_id}:{int(time.time())}"
-    spotify_auth_states[user_id] = state
-    params = {
-        "client_id": SPOTIFY_CLIENT_ID,
-        "response_type": "code",
-        "redirect_uri": SPOTIFY_REDIRECT_URI,
-        "scope": SPOTIFY_SCOPES,
-        "state": state,
-        "show_dialog": "true",
-    }
-    return f"https://accounts.spotify.com/authorize?{urlencode(params)}"
-
-def _spotify_parse_code(input_text: str) -> tuple:
-    text = (input_text or "").strip()
-    if text.startswith("http://") or text.startswith("https://"):
-        parsed = urlparse(text)
-        params = parse_qs(parsed.query)
-        code = params.get("code", [""])[0]
-        state = params.get("state", [""])[0]
-        return code, state
-    return text, ""
-
-def _spotify_exchange_code(code: str) -> Optional[dict]:
-    if not SPOTIFY_CLIENT_ID or not SPOTIFY_CLIENT_SECRET:
-        return None
-    auth_header = base64.b64encode(f"{SPOTIFY_CLIENT_ID}:{SPOTIFY_CLIENT_SECRET}".encode("utf-8")).decode("utf-8")
-    data = {
-        "grant_type": "authorization_code",
-        "code": code,
-        "redirect_uri": SPOTIFY_REDIRECT_URI,
-    }
-    headers = {"Authorization": f"Basic {auth_header}"}
-    resp = requests.post("https://accounts.spotify.com/api/token", data=data, headers=headers, timeout=10)
-    if resp.status_code != 200:
-        print(f"[spotify] Token exchange failed: {resp.status_code} {resp.text[:200]}")
-        return None
-    return resp.json()
-
-def _spotify_refresh_access_token(refresh_token: str) -> Optional[dict]:
-    if not SPOTIFY_CLIENT_ID or not SPOTIFY_CLIENT_SECRET:
-        return None
-    auth_header = base64.b64encode(f"{SPOTIFY_CLIENT_ID}:{SPOTIFY_CLIENT_SECRET}".encode("utf-8")).decode("utf-8")
-    data = {
-        "grant_type": "refresh_token",
-        "refresh_token": refresh_token,
-    }
-    headers = {"Authorization": f"Basic {auth_header}"}
-    resp = requests.post("https://accounts.spotify.com/api/token", data=data, headers=headers, timeout=10)
-    if resp.status_code != 200:
-        print(f"[spotify] Token refresh failed: {resp.status_code} {resp.text[:200]}")
-        return None
-    return resp.json()
-
-def _spotify_get_valid_token(user_id: int) -> Optional[str]:
-    db = _load_data()
-    record = _spotify_get_user_record(db, user_id)
-    if not record:
-        return None
-    access_token = record.get("access_token")
-    refresh_token = record.get("refresh_token")
-    expires_at = record.get("expires_at", 0)
-    if access_token and time.time() < float(expires_at) - 30:
-        return access_token
-    if not refresh_token:
-        return None
-    refreshed = _spotify_refresh_access_token(refresh_token)
-    if not refreshed or "access_token" not in refreshed:
-        return None
-    new_access = refreshed["access_token"]
-    expires_in = int(refreshed.get("expires_in", 3600))
-    record["access_token"] = new_access
-    record["expires_at"] = time.time() + expires_in
-    if refreshed.get("refresh_token"):
-        record["refresh_token"] = refreshed["refresh_token"]
-    _spotify_save_user_record(db, user_id, record)
-    asyncio.create_task(_save_data(db))
-    return new_access
-
-def _spotify_api_request(user_id: int, method: str, endpoint: str, token: str, params: dict = None, json_body: dict = None, retry: bool = True) -> tuple:
-    headers = {"Authorization": f"Bearer {token}"}
-    if json_body is not None:
-        headers["Content-Type"] = "application/json"
-    url = f"https://api.spotify.com/v1{endpoint}"
-    resp = requests.request(method, url, params=params, json=json_body, headers=headers, timeout=10)
-    if resp.status_code == 401 and retry:
-        new_token = _spotify_get_valid_token(user_id)
-        if new_token and new_token != token:
-            return _spotify_api_request(user_id, method, endpoint, new_token, params=params, json_body=json_body, retry=False)
-    if resp.status_code == 204:
-        return resp.status_code, None
-    try:
-        data = resp.json()
-    except Exception:
-        data = {"error": resp.text}
-    return resp.status_code, data
-
-def _spotify_get_devices(user_id: int, token: str) -> list:
-    status, data = _spotify_api_request(user_id, "GET", "/me/player/devices", token)
-    if status != 200:
-        return []
-    return data.get("devices", []) or []
-
-def _spotify_get_player_state(user_id: int, token: str) -> Optional[dict]:
-    status, data = _spotify_api_request(user_id, "GET", "/me/player", token)
-    if status not in (200, 204):
-        return None
-    return data
-
-def _spotify_transfer_playback(user_id: int, token: str, device_id: str, play: bool = False) -> bool:
-    payload = {"device_ids": [device_id], "play": play}
-    status, _ = _spotify_api_request(user_id, "PUT", "/me/player", token, json_body=payload)
-    return status in (200, 204)
-
-def _spotify_start_playback(user_id: int, token: str, device_id: str, uris: list) -> tuple:
-    payload = {"uris": uris}
-    params = {"device_id": device_id} if device_id else None
-    status, data = _spotify_api_request(user_id, "PUT", "/me/player/play", token, params=params, json_body=payload)
-    if status in (200, 204):
-        return True, status, data
-    print(f"[spotify] Start playback failed: {status} {str(data)[:200]}")
-    return False, status, data
-
-def _spotify_enqueue_uri(user_id: int, token: str, device_id: str, uri: str) -> tuple:
-    params = {"uri": uri}
-    if device_id:
-        params["device_id"] = device_id
-    status, data = _spotify_api_request(user_id, "POST", "/me/player/queue", token, params=params)
-    if status in (200, 204):
-        return True, status, data
-    print(f"[spotify] Queue failed: {status} {str(data)[:200]}")
-    return False, status, data
-
-def _spotify_extract_type_and_id(url: str) -> tuple:
-    url = (url or "").strip()
-    if url.startswith("spotify:"):
-        parts = url.split(":")
-        if len(parts) >= 3:
-            return parts[1], parts[2]
-    parsed = urlparse(url)
-    if "open.spotify.com" in parsed.netloc:
-        path_parts = [p for p in parsed.path.split("/") if p]
-        if len(path_parts) >= 2:
-            return path_parts[0], path_parts[1]
-    return "", ""
-
-def _spotify_fetch_track(user_id: int, token: str, track_id: str) -> Optional[dict]:
-    status, data = _spotify_api_request(user_id, "GET", f"/tracks/{track_id}", token)
-    if status != 200:
-        return None
-    artists = ", ".join(a.get("name", "") for a in data.get("artists", []))
-    return {
-        "uri": data.get("uri"),
-        "title": data.get("name", "Neznámá skladba"),
-        "artists": artists,
-        "duration_ms": data.get("duration_ms", 180000),
-        "url": data.get("external_urls", {}).get("spotify", ""),
-    }
-
-def _spotify_fetch_playlist_tracks(user_id: int, token: str, playlist_id: str) -> list:
-    tracks = []
-    limit = 100
-    offset = 0
-    while True:
-        params = {"limit": limit, "offset": offset}
-        status, data = _spotify_api_request(user_id, "GET", f"/playlists/{playlist_id}/tracks", token, params=params)
-        if status != 200:
-            break
-        items = data.get("items", []) or []
-        for item in items:
-            track = item.get("track") or {}
-            if not track or track.get("is_local"):
-                continue
-            artists = ", ".join(a.get("name", "") for a in track.get("artists", []))
-            tracks.append({
-                "uri": track.get("uri"),
-                "title": track.get("name", "Neznámá skladba"),
-                "artists": artists,
-                "duration_ms": track.get("duration_ms", 180000),
-                "url": track.get("external_urls", {}).get("spotify", ""),
-            })
-        if not data.get("next"):
-            break
-        offset += limit
-    return tracks
-
 # v2.5 CONFIG HELPERS
 def _get_channel_for_type(guild: discord.Guild, channel_type: str) -> Optional[discord.TextChannel]:
     """Vrátí channel objektu dle typu (blessing, freegames), nebo fallback na jméno."""
@@ -728,29 +532,36 @@ def _shuffle_queue(guild_id: int):
     queue.extend(rest)
     return True
 
+def _extract_playlist_tracks_sync(url: str) -> list:
+    """Blokující (synchronní) část extrakce playlistu – volej jen přes asyncio.to_thread."""
+    ydl_opts = {
+        "extract_flat": "in_playlist",
+        "quiet": True,
+        "no_warnings": True,
+        "socket_timeout": 30
+    }
+
+    with _yt_dlp.YoutubeDL(ydl_opts) as ydl:
+        info = ydl.extract_info(url, download=False)
+        tracks = []
+
+        if info and "entries" in info:
+            for entry in info.get("entries", []):
+                if entry:
+                    track_url = f"https://www.youtube.com/watch?v={entry.get('id', '')}"
+                    track_title = entry.get("title", "Neznámá skladba")
+                    tracks.append({"url": track_url, "title": track_title})
+
+        return tracks
+
 async def extract_playlist_tracks(url: str) -> list:
-    """Extrahuj všechny skladby z YouTube playlistu (v2.4.1)."""
+    """Extrahuj všechny skladby z YouTube playlistu (v2.4.1).
+
+    v2.8.1: Běží v thread poolu (asyncio.to_thread), aby extrakce velkého
+    playlistu neblokovala event loop (a tím celého bota na všech serverech).
+    """
     try:
-        ydl_opts = {
-            "extract_flat": "in_playlist",
-            "quiet": True,
-            "no_warnings": True,
-            "socket_timeout": 30
-        }
-        
-        with _yt_dlp.YoutubeDL(ydl_opts) as ydl:
-            info = ydl.extract_info(url, download=False)
-            tracks = []
-            
-            if info and "entries" in info:
-                for entry in info.get("entries", []):
-                    if entry:
-                        track_url = f"https://www.youtube.com/watch?v={entry.get('id', '')}"
-                        track_title = entry.get("title", "Neznámá skladba")
-                        tracks.append({"url": track_url, "title": track_title})
-            
-            return tracks
-    
+        return await asyncio.to_thread(_extract_playlist_tracks_sync, url)
     except Exception as e:
         print(f"[playlist] Error extracting tracks: {e}")
         return []
@@ -823,7 +634,8 @@ async def play_next(guild: discord.Guild, text_channel: discord.TextChannel):
     
     try:
         print(f"[music] Extracting: {song['url']}")
-        extracted = ytdlp_extract(song['url'])
+        # v2.8.1: asyncio.to_thread – blokující yt-dlp extrakce nesmí zaseknout event loop
+        extracted = await asyncio.to_thread(ytdlp_extract, song['url'])
         
         vc = await ensure_voice_by_guild(guild, text_channel=text_channel)
         if not vc:
@@ -1925,7 +1737,8 @@ async def yt_command(interaction: discord.Interaction, url: str):
         # SINGLE TRACK MODE – Původní v2.4 logika (NEZMĚNÍ SE!)
         try:
             title = "Načítám..."
-            extracted = ytdlp_extract(url)
+            # v2.8.1: asyncio.to_thread – blokující yt-dlp extrakce nesmí zaseknout event loop
+            extracted = await asyncio.to_thread(ytdlp_extract, url)
             title = extracted.get("title", "Neznámá skladba")
             duration = extracted.get("duration", 180)  # v2.4: ulož dobu trvání
             song_durations[url] = duration
@@ -1952,173 +1765,6 @@ async def yt_command(interaction: discord.Interaction, url: str):
             
             # ✨ Přidej XP za hudební aktivitu
             await add_xp_to_user(interaction.user.id, reason="music_command")
-
-@bot.tree.command(name="spauth", description="Spotify OAuth přihlášení")
-async def spauth_command(interaction: discord.Interaction):
-    """Start Spotify OAuth flow for the user."""
-    if not SPOTIFY_CLIENT_ID or not SPOTIFY_CLIENT_SECRET:
-        await interaction.response.send_message("❌ Chybí Spotify klientské údaje v .env (SPOTIFY_CLIENT_ID/SECRET).", ephemeral=True)
-        return
-    auth_url = _spotify_make_auth_url(interaction.user.id)
-    if not auth_url:
-        await interaction.response.send_message("❌ Nelze vytvořit Spotify auth URL.", ephemeral=True)
-        return
-    message = (
-        "🔐 **Spotify OAuth**\n"
-        "1) Otevři tento odkaz a přihlas se: \n"
-        f"{auth_url}\n\n"
-        "2) Po přihlášení zkopíruj celou URL z prohlížeče (i když stránka hlásí chybu)\n"
-        "3) Pošli ji sem přes `/spcode <URL>`"
-    )
-    await interaction.response.send_message(message, ephemeral=True)
-
-@bot.tree.command(name="spcode", description="Dokonči Spotify OAuth autorizaci")
-async def spcode_command(interaction: discord.Interaction, code_or_url: str):
-    """Finish Spotify OAuth with code or redirect URL."""
-    if not SPOTIFY_CLIENT_ID or not SPOTIFY_CLIENT_SECRET:
-        await interaction.response.send_message("❌ Chybí Spotify klientské údaje v .env (SPOTIFY_CLIENT_ID/SECRET).", ephemeral=True)
-        return
-    code, state = _spotify_parse_code(code_or_url)
-    if not code:
-        await interaction.response.send_message("❌ Nenašel jsem `code` v URL. Zkus zkopírovat celou URL.", ephemeral=True)
-        return
-    expected_state = spotify_auth_states.get(interaction.user.id)
-    if state and expected_state and state != expected_state:
-        await interaction.response.send_message("❌ Nesouhlasí OAuth state. Zkus `/spauth` znovu.", ephemeral=True)
-        return
-    token_data = _spotify_exchange_code(code)
-    if not token_data or "access_token" not in token_data:
-        await interaction.response.send_message("❌ Autorizace selhala. Zkus `/spauth` znovu.", ephemeral=True)
-        return
-    db = _load_data()
-    record = _spotify_get_user_record(db, interaction.user.id) or {}
-    record["access_token"] = token_data["access_token"]
-    if token_data.get("refresh_token"):
-        record["refresh_token"] = token_data["refresh_token"]
-    record["expires_at"] = time.time() + int(token_data.get("expires_in", 3600))
-    _spotify_save_user_record(db, interaction.user.id, record)
-    await _save_data(db)
-    await interaction.response.send_message("✅ Spotify autorizace úspěšná! Můžeš použít `/sp`.", ephemeral=True)
-
-@bot.tree.command(name="sp", description="Přidej Spotify skladbu nebo playlist do fronty")
-async def sp_command(interaction: discord.Interaction, spotify_url: str):
-    """Slash command /sp – Spotify queue + Connect playback."""
-    await interaction.response.defer()
-    user_id = interaction.user.id
-    token = _spotify_get_valid_token(user_id)
-    if not token:
-        await interaction.followup.send("❌ Nejsi přihlášený ke Spotify. Použij `/spauth`.")
-        return
-    item_type, item_id = _spotify_extract_type_and_id(spotify_url)
-    if item_type not in ("track", "playlist") or not item_id:
-        await interaction.followup.send("❌ Nepodporovaný Spotify odkaz. Použij track nebo playlist URL.")
-        return
-    if item_type == "track":
-        track = _spotify_fetch_track(user_id, token, item_id)
-        if not track or not track.get("uri"):
-            await interaction.followup.send("❌ Nemohu načíst Spotify skladbu.")
-            return
-        tracks = [track]
-    else:
-        tracks = _spotify_fetch_playlist_tracks(user_id, token, item_id)
-        if not tracks:
-            await interaction.followup.send("❌ Playlist je prázdný nebo nedostupný.")
-            return
-    queue = _spotify_queue_for(user_id)
-    added = []
-    skipped = 0
-    for track in tracks:
-        uri = track.get("uri")
-        if not uri or _spotify_is_uri_in_queue(user_id, uri):
-            skipped += 1
-            continue
-        queue.append(track)
-        added.append(track)
-    if not added:
-        await interaction.followup.send("⚠️ Všechny skladby už jsou ve Spotify frontě (duplicitní).")
-        return
-    devices = _spotify_get_devices(user_id, token)
-    if not devices:
-        await interaction.followup.send("❌ Nenalezeno žádné Spotify zařízení. Otevři Spotify a pusť libovolnou skladbu.")
-        return
-    active_device = next((d for d in devices if d.get("is_active")), None)
-    device_id = active_device.get("id") if active_device else None
-    if not device_id:
-        device_id = devices[0].get("id")
-        if device_id:
-            _spotify_transfer_playback(user_id, token, device_id, play=False)
-    state = _spotify_get_player_state(user_id, token)
-    is_playing = bool(state and state.get("is_playing"))
-    start_index = 0
-    if not is_playing and device_id:
-        first_uri = added[0].get("uri")
-        if first_uri:
-            ok, status, data = _spotify_start_playback(user_id, token, device_id, [first_uri])
-            if ok:
-                start_index = 1
-            elif status == 403:
-                await interaction.followup.send("❌ Spotify Premium je nutný pro programmatic playback.")
-                return
-            elif status == 404:
-                await interaction.followup.send("❌ Není aktivní Spotify zařízení. Otevři Spotify a pusť skladbu.")
-                return
-    enqueued_count = 0
-    if start_index == 1:
-        enqueued_count += 1
-    for track in added[start_index:]:
-        uri = track.get("uri")
-        if uri:
-            ok, status, _ = _spotify_enqueue_uri(user_id, token, device_id, uri)
-            if not ok and status == 403:
-                await interaction.followup.send("❌ Spotify Premium je nutný pro programmatic playback.")
-                return
-            if ok:
-                enqueued_count += 1
-    if enqueued_count > 0:
-        increment_songs_played_by(enqueued_count)
-    mins, secs, count = _estimate_spotify_queue_duration(user_id)
-    summary = f"✅ Přidáno do Spotify fronty: **{len(added)}**"
-    if skipped > 0:
-        summary += f"\n⊘ Duplikáty přeskočeny: {skipped}"
-    summary += f"\n⏱️ Odhad fronty: ~{mins}m {secs}s ({count} skladeb)"
-    await interaction.followup.send(summary)
-
-@bot.tree.command(name="spqueue", description="Zobraz Spotify frontu")
-async def spqueue_command(interaction: discord.Interaction):
-    """Show Spotify queue for the user."""
-    queue = _spotify_queue_for(interaction.user.id)
-    if not queue:
-        await interaction.response.send_message("🎧 Spotify fronta je prázdná.")
-        return
-    lines = []
-    for idx, item in enumerate(list(queue)[:10], 1):
-        title = item.get("title", "Neznámá skladba")
-        artists = item.get("artists", "")
-        url = item.get("url", "")
-        line = f"{idx}. **{title}**"
-        if artists:
-            line += f" – {artists}"
-        if url:
-            line += f" ([odkaz]({url}))"
-        lines.append(line)
-    mins, secs, count = _estimate_spotify_queue_duration(interaction.user.id)
-    desc = "\n".join(lines)
-    if count > 10:
-        desc += f"\n... a dalších {count - 10} skladeb"
-    desc += f"\n\n⏱️ Odhad: ~{mins}m {secs}s ({count} skladeb)"
-    embed = discord.Embed(title="🎧 Spotify fronta", description=desc, color=discord.Color.green())
-    await interaction.response.send_message(embed=embed)
-
-@bot.tree.command(name="spclear", description="Vymaž Spotify frontu")
-async def spclear_command(interaction: discord.Interaction):
-    """Clear Spotify queue for the user."""
-    queue = _spotify_queue_for(interaction.user.id)
-    if not queue:
-        await interaction.response.send_message("🎧 Spotify fronta je už prázdná.")
-        return
-    removed = len(queue)
-    queue.clear()
-    await interaction.response.send_message(f"✅ Spotify fronta vymazána ({removed} skladeb).")
 
 @bot.tree.command(name="skip", description="Přeskoč na další skladbu")
 async def skip_command(interaction: discord.Interaction):
@@ -2275,8 +1921,6 @@ async def np_command(interaction: discord.Interaction):
         await interaction.response.send_message(embed=embed, view=MusicControlView(guild.id))
     except Exception as e:
         await interaction.response.send_message(f"❌ Chyba: {str(e)[:100]}")
-    except Exception as e:
-        await interaction.response.send_message(f"❌ Chyba: {str(e)[:100]}")
 
 @bot.tree.command(name="queue", description="Zobraz frontu skladeb")
 async def queue_command(interaction: discord.Interaction):
@@ -2317,16 +1961,20 @@ async def voicetest_command(interaction: discord.Interaction):
         await interaction.followup.send("❌ Bot není v voice kanálu!")
         return
     try:
+        # v2.8.1 FIX: `FFmpegOpusAudio` nemá parametr `stdin=` (TypeError při každém volání)
+        # a `pipe:` bez zápisu dat by ffmpeg stejně navěky blokovalo. Navíc `anullsrc`
+        # je TICHO, ne tón – i kdyby to "fungovalo", nešlo by nic slyšet.
+        # Správně: lavfi vstup přímo jako `source` (žádné piping), `sine` = skutečný 440Hz tón.
         source = discord.FFmpegOpusAudio(
-            "pipe:",
-            stdin=True,
-            before_options="-f lavfi -i anullsrc=r=48000:cl=mono -t 3",
+            "sine=frequency=440:sample_rate=48000:duration=3",
+            before_options="-f lavfi",
             options=get_ffmpeg_options()
         )
         vc.play(source)
-        await interaction.followup.send("🔊 Hraju 3 sekundový tón...")
+        await interaction.followup.send("🔊 Hraju 3 sekundový tón (440Hz)...")
         await asyncio.sleep(3.5)
-        vc.stop()
+        if vc.is_playing():
+            vc.stop()
         await interaction.followup.send("✅ Voice test úspěšný!")
     except Exception as e:
         await interaction.followup.send(f"❌ Voice test selhalo: {str(e)[:100]}")
@@ -2894,27 +2542,26 @@ async def version_command(interaction: discord.Interaction):
     """Show bot version and changelog."""
     try:
         embed = discord.Embed(
-            title="ℹ️ Ježíš Discord Bot – v2.8",
-            description="Spotify Integration Pack",
+            title="ℹ️ Ježíš Discord Bot – v2.8.1-beta",
+            description="Music Fix Pack",
             color=discord.Color.gold()
         )
-        
+
         embed.add_field(
             name="⏱️ Version",
-            value="v2.8\nSpotify Integration Pack",
+            value="v2.8.1-beta\nMusic Fix Pack",
             inline=True
         )
-        
+
         embed.add_field(
             name="📅 Release",
-            value="2026-02-15",
+            value="2026-08-26",
             inline=True
         )
         
         embed.add_field(
             name="🎵 Music Features",
             value="""🎵 YouTube & Playlist support
-🎧 Spotify Connect playback
 📊 Queue duration estimate
 🚫 Duplicate blocking""",
             inline=True
@@ -2933,7 +2580,7 @@ async def version_command(interaction: discord.Interaction):
             name="📊 v2.7 Analytics (NEW)",
             value="""🏆 `/leaderboard` – Top 10 hráči
 📊 `/serverstats` – Server aktivita
-📈 `/myactivity` – Tvůj profil
+📈 `/profile` – Tvůj profil
 📅 `/weeklysummary` – Týdenní trend""",
             inline=True
         )
@@ -2945,7 +2592,16 @@ async def version_command(interaction: discord.Interaction):
 🎪 PlayStation Plus""",
             inline=True
         )
-        
+
+        embed.add_field(
+            name="🔧 v2.8.1 Bugfixy (NEW)",
+            value="""🎥 YouTube extrakce opravena (PO token/SABR)
+⚡ Přehrávání už neblokuje celého bota
+🔊 `/voicetest` opraven (reálný 440Hz tón)
+🩺 `/diag` – živý yt-dlp self-test""",
+            inline=True
+        )
+
         embed.add_field(
             name="📚 Dokumentace",
             value="[GitHub](https://github.com/Braska-botmaker/Chatbot-discord-JESUS) | [Docs](https://github.com/Braska-botmaker/Chatbot-discord-JESUS/tree/main/docs)",
@@ -2972,26 +2628,6 @@ async def commands_command(interaction: discord.Interaction):
         embed1.add_field(
             name="/yt <url>",
             value="Přidej skladbu nebo playlist do fronty\n🆙 **+1-2 XP**",
-            inline=False
-        )
-        embed1.add_field(
-            name="/spauth | /spcode",
-            value="Spotify OAuth přihlášení (Connect ovládání)",
-            inline=False
-        )
-        embed1.add_field(
-            name="/sp <spotify_url>",
-            value="Přidej Spotify skladbu/playlist do fronty",
-            inline=False
-        )
-        embed1.add_field(
-            name="/spqueue",
-            value="Zobraz Spotify frontu",
-            inline=False
-        )
-        embed1.add_field(
-            name="/spclear",
-            value="Vymaž Spotify frontu",
             inline=False
         )
         embed1.add_field(
@@ -3061,7 +2697,7 @@ async def commands_command(interaction: discord.Interaction):
             inline=False
         )
         embed3.add_field(
-            name="/myactivity",
+            name="/profile",
             value="Tvůj osobní profil\n⭐ XP & Level | 🔥 Streak | 🎯 Top hry | 🏅 Dosažení",
             inline=False
         )
@@ -3081,11 +2717,6 @@ async def commands_command(interaction: discord.Interaction):
         embed4.add_field(
             name="/freegames",
             value="Hry zdarma z 3 zdrojů\n🟣 Epic Games | 🎮 Steam | 🎪 PlayStation Plus",
-            inline=False
-        )
-        embed4.add_field(
-            name="/xp",
-            value="Zobrazit tvoje XP a level",
             inline=False
         )
         embed4.add_field(
@@ -3137,7 +2768,21 @@ async def diag_command(interaction: discord.Interaction):
     voice_count = len(bot.voice_clients)
     embed.add_field(name="🎤 Voice", value=f"Connected: {voice_count}", inline=True)
     if bot.user:
-        embed.add_field(name="⏱️ Version", value="v2.8\nSpotify Integration Pack", inline=True)
+        embed.add_field(name="⏱️ Version", value="v2.8.1-beta\nMusic Fix Pack", inline=True)
+
+    # v2.8.1: Živý test yt-dlp/YouTube extrakce – nejrychlejší způsob, jak zjistit
+    # jestli je problém v zastaralém yt-dlp, nebo jinde.
+    yt_dlp_version = "❌ Nenačteno"
+    yt_test = "⚠️ Neotestováno"
+    try:
+        if _yt_dlp:
+            yt_dlp_version = getattr(_yt_dlp.version, "__version__", "?")
+            test_info = await asyncio.to_thread(ytdlp_extract, "https://www.youtube.com/watch?v=dQw4w9WgXcQ")
+            yt_test = f"✅ OK ({test_info.get('title', '?')[:40]})"
+    except Exception as e:
+        yt_test = f"❌ {str(e)[:150]}"
+    embed.add_field(name="🎥 yt-dlp", value=f"Verze: {yt_dlp_version}\nTest: {yt_test}\nKlienti: {', '.join(YTDLP_PLAYER_CLIENTS)}", inline=False)
+
     await interaction.followup.send(embed=embed)
 
 @bot.tree.command(name="setchannel", description="Nastav kanál pro požehnání nebo hry zdarma")

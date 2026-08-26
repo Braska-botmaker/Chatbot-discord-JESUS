@@ -17,7 +17,7 @@ Najdi svůj problém a vrátí se ti řešení.
    - Bot má **Speak** ✅
 3. Zkus jiný voice kanál
 4. Restartuj bota: `sudo systemctl restart discordbot`
-5. Běž na **RPi?** Spusť: `!diag` a podívej se na UDP buffery
+5. Běž na **RPi?** Spusť: `/diag` a podívej se na UDP buffery
 
 **Error 4006 (Invalid Session Description)?** Viz sekce níž ↓
 
@@ -66,11 +66,11 @@ Pokud stále vidíš Error 4006 v logech:
 
 ### ❌ „FFmpeg test selhal: Not connected to voice"
 
-**Příčina:** `!vtest` se nemůže spustit, protože nejsi ve voice kanálu
+**Příčina:** `/voicetest` se nemůže spustit, protože nejsi ve voice kanálu
 
 **Řešení:**
 1. Nejdřív se **připoj do voice kanálu** sám
-2. Pak spusť: `!vtest`
+2. Pak spusť: `/voicetest`
 3. Bot by měl zahrát 3sekundový tón (sine wave 440Hz)
 
 Pokud stále selže:
@@ -126,7 +126,7 @@ python3 -c "import discord.opus; print(discord.opus.is_loaded())"
 **Řešení:**
 1. Zkontroluj odkaz:
    ```
-   !play https://www.youtube.com/watch?v=dQw4w9WgXcQ
+   /yt https://www.youtube.com/watch?v=dQw4w9WgXcQ
    ```
    (zkus Rickroll 😄)
 
@@ -140,7 +140,7 @@ python3 -c "import discord.opus; print(discord.opus.is_loaded())"
 
 3. Zkontroluj logy:
    ```bash
-   !play <url>
+   /yt <url>
    sudo journalctl -u discordbot -f | grep -i "yt-dlp"
    ```
 
@@ -378,16 +378,16 @@ sudo journalctl -u discordbot > /tmp/discordbot_logs.txt
 sudo systemctl status discordbot --no-pager
 
 # 2. Spusť diagnostiku (v Discordu)
-!diag
+/diag
 
 # 3. Zkontroluj logy (posledních 10 řádků)
 sudo journalctl -u discordbot -n 10
 
 # 4. Testuj voice
-!vtest
+/voicetest
 
 # 5. Testuj YouTube
-!play https://www.youtube.com/watch?v=dQw4w9WgXcQ
+/yt https://www.youtube.com/watch?v=dQw4w9WgXcQ
 
 # 6. Zkontroluj paměť a CPU
 free -h

@@ -4,6 +4,66 @@ Všechny změny v tomto projektu jsou zaznamenány v tomto souboru.
 
 ---
 
+## [v2.8.1-beta] – 2026-08-26 – Music Fix Pack
+
+Kompletní code review `bot.py` po hlášení, že přestalo fungovat přehrávání hudby z YouTube.
+Provedeno vč. deep research aktuálního stavu YouTube anti-bot ochran a živého ověření proti
+reálnému YouTube (ne jen teoreticky).
+
+### 🐛 Bugfixy – YouTube / hudba
+
+- **Bot mrzl při každém načítání skladby** – `ytdlp_extract()` (síťová, blokující funkce) se
+  volala přímo z `async` kódu v `play_next()` a `/yt`, bez `asyncio.to_thread`. Ověřeno měřením:
+  event loop nedostal jediný tik po dobu celé extrakce → zamrzlý bot na **všech** serverech,
+  riziko odpojení od Discord gateway při delších timeoutech. Opraveno na 3 místech
+  (`play_next`, `/yt`, `extract_playlist_tracks`).
+- **Chybějící obrana proti YouTube PO token/SABR ochranám** (zavedeným 2024–2025) – `YDL_OPTS`
+  teď obsahuje `extractor_args` s player klienty, které nepotřebují PO token
+  (`android_vr,web_safari,tv` – nastavitelné přes nový `.env` klíč `YTDLP_PLAYER_CLIENTS`).
+  Přidána i volitelná podpora `YTDLP_COOKIES_FILE` pro věkově omezená videa.
+- **Tiché selhání beze zvuku** – reprodukováno se starou verzí yt-dlp: extrakce „uspěje", ale
+  vrátí neplatný `mhtml` stream místo audia (bot by hlásil přehrávání, ale bylo by ticho).
+  Přidán guard v `ytdlp_extract()`, který takový stav detekuje a vrátí čitelnou chybu.
+- **`song_durations` bug** – `ytdlp_extract()` nikdy nevracel `duration`, takže odhad délky
+  fronty u `/yt` byl vždy fallback 180s/skladbu. Teď vrací skutečnou délku z yt-dlp.
+- **`requirements.txt`** – spodní hranice `yt-dlp>=2023.11.0` byla 2+ roky zastaralá a nic
+  nenutilo instalaci se aktualizovat (YouTube extrakci láme průběžně). Zvýšeno + okomentováno.
+
+### 🐛 Bugfixy – ostatní
+
+- **`/voicetest` byl vždy rozbitý** – volal `discord.FFmpegOpusAudio(..., stdin=True, ...)`,
+  ale tento parametr v discord.py neexistuje → `TypeError` při každém spuštění. Navíc i po
+  opravě konstruktoru přehrával `anullsrc` (ticho), ne tón – i „úspěšný" test by nic neřekl.
+  Opraveno na `sine=frequency=440...` (skutečný slyšitelný 440Hz tón) bez neplatného parametru.
+- **Neexistující příkazy v nápovědě** – `/commands`, `/version` a část dokumentace odkazovaly
+  na `/myactivity` a `/xp`, které v kódu neexistují (aktuální název je `/profile`). Opraveno
+  všude včetně README.md, QUICK_START.md, RYCHLY_START.md.
+- Odstraněn mrtvý duplicitní `except` blok v `/np`.
+
+### 🩺 Diagnostika
+
+- **`/diag`** – nové pole se **živým self-testem** yt-dlp (verze + reálná zkušební extrakce),
+  takže regrese v YouTube přehrávání jde ověřit jedním příkazem místo ručního debugování.
+
+### ⚙️ Konfigurace
+
+- Nové (volitelné) `.env` klíče: `YTDLP_PLAYER_CLIENTS`, `YTDLP_COOKIES_FILE` – viz
+  `.env.example` / `config/.env.example`.
+
+### ⏸️ Odloženo
+
+- **Spotify integrace dočasně odebrána z `bot.py`** (`/spauth`, `/spcode`, `/sp`, `/spqueue`,
+  `/spclear` a všechny `_spotify_*` helper funkce) a přesunuta v Roadmapě z v2.8 na plánovanou
+  v2.9 – priorita šla na opravu YouTube přehrávání. Kód zůstává dohledatelný v historii gitu
+  (commit `v2.8.0-alfa` a starší). `SPOTIFY_CLIENT_ID/SECRET/REDIRECT_URI` odstraněny
+  z `.env.example`.
+
+### 🗑️ Úklid
+
+- Odstraněn `UPDATES_v2.8.md` (redundantní s tímto changelogem).
+
+---
+
 ## [v2.8] – 2026-02-15
 
 ### ✨ Nové funkce
@@ -513,5 +573,5 @@ Máte bug report nebo feature request? Napište na GitHub nebo zkontrolujte sekc
 
 ---
 
-**Poslední aktualizace:** 2025-12-12
+**Poslední aktualizace:** 2026-08-26
 **Maintainer:** Matěj Horák (Braska-botmaker)

@@ -1,6 +1,6 @@
 # ✝️ Ježíš Discord Bot – hudba, verše a hry zdarma 🙏
 
-**Verze:** v2.8 – Spotify Integration Pack | **Platform:** Raspberry Pi Ready
+**Verze:** v2.8.1-beta – Music Fix Pack | **Platform:** Raspberry Pi Ready
 
 Discord bot napsaný v Pythonu (discord.py), který umí:
 
@@ -9,7 +9,10 @@ Discord bot napsaný v Pythonu (discord.py), který umí:
 * 🙏 Žehnat hráčům při spuštění her a reagovat na společné hrání ve voice
 * 🎁 Kadý večer publikovat „Hry zdarma” z Epic, Steam, PlayStation Plus s **individuálními embedy, obrázky**
 * 🔘 NOVÉ v2.6.5: Jednotný design embeda – `/freegames` = automatické posílání, PS+ články v jednom embedu
-* 🎮 NOVÉ v2.6.6: Steam Limited-Time Giveaways přes Reddit API `/r/FreeGameFindings`* 📊 **NOVÉ v2.7**: Server Analytics s leaderboardy – `/serverstats`, `/leaderboard`, `/myactivity`, `/weeklysummary`* ⚙️ Konfigurovat kanály per-guild s `/setchannel` a `/config`
+* 🎮 NOVÉ v2.6.6: Steam Limited-Time Giveaways přes Reddit API `/r/FreeGameFindings`
+* 📊 **NOVÉ v2.7**: Server Analytics s leaderboardy – `/serverstats`, `/leaderboard`, `/profile`, `/weeklysummary`
+* ⚙️ Konfigurovat kanály per-guild s `/setchannel` a `/config`
+* 🔧 **NOVÉ v2.8.1**: Opravené YouTube přehrávání (aktuální yt-dlp ochrany, neblokuje bota) a `/voicetest`
 * 🎮 Minihry s XP systémem (kviz, veršový duel, RNG požehnání)
 * ✨ XP odměny za hudbu a hlasovou aktivitu s anti-cheat ochranou
 * ℹ️ Slash commands: `/commands`, `/version`, `/diag` s automatickým autocomplete
@@ -136,14 +139,15 @@ V kořeni projektu vytvořte soubor `.env`:
 
 ```env
 DISCORD_TOKEN=PASTE_VAS_TOKEN_SEM
-SPOTIFY_CLIENT_ID=PASTE_SPOTIFY_CLIENT_ID
-SPOTIFY_CLIENT_SECRET=PASTE_SPOTIFY_CLIENT_SECRET
-SPOTIFY_REDIRECT_URI=http://localhost:8888/callback
 ```
 
-> Pozn.: `SPOTIFY_REDIRECT_URI` musí být uvedena i v Spotify Developer Dashboardu.
+> Pozn.: Spotify integrace (`SPOTIFY_CLIENT_ID`/`SECRET`/`REDIRECT_URI`) je ve v2.8.1-beta
+> odložena na pozdější verzi (viz Roadmapa) – momentálně se nepoužívá.
 
 > Token nikdy necommituje do repozitáře.
+
+> Volitelné proměnné pro YouTube přehrávání (`YTDLP_PLAYER_CLIENTS`, `YTDLP_COOKIES_FILE`)
+> najdeš okomentované v `.env.example`.
 
 ---
 
@@ -174,17 +178,13 @@ Voice práva v cílovém kanálu:
 
 ---
 
-## ⌨️ Příkazy (Slash Commands – v2.6.1)
+## ⌨️ Příkazy (Slash Commands – v2.8.1-beta)
 
 Hezký přehled najdete v `/commands`. Základ:
 
 ### Hudba
 
 * `/yt <url>` – přidá skladbu nebo playlist do fronty a spustí přehrávání (YouTube přes yt-dlp) - **+1-2 XP**
-* `/spauth` – Spotify OAuth přihlášení (nutné pro `/sp`)
-* `/spcode <url>` – dokončení Spotify OAuth (vložíš redirect URL)
-* `/sp <spotify_url>` – přidá Spotify skladbu/playlist do fronty (Spotify Connect)
-* Pozn.: Spotify Connect vyžaduje Spotify Premium
 * `/skip` – přeskoči aktuální skladbu - **+1-2 XP**
 * `/pause` / `/resume` – pauza/obnovení
 * `/stop` – zastaví a vyčistí frontu
@@ -192,7 +192,9 @@ Hezký přehled najdete v `/commands`. Základ:
 * `/np` – zobrazí právě přehrávanou skladbu
 * `/queue` – vypíše frontu s odhadem celkového času
 * `/shuffle` – náhodně zamíchá pořadí skladeb - **+1-2 XP**
-* `/voicetest` – rychlý 3s tón pro ověření FFmpeg/voice
+* `/voicetest` – rychlý 3s tón (440Hz) pro ověření FFmpeg/voice
+
+> 🎧 Spotify příkazy (`/spauth`, `/sp`, ...) jsou dočasně odložené na pozdější verzi – viz Roadmapa.
 
 ### Biblické příkazy
 
@@ -200,16 +202,21 @@ Hezký přehled najdete v `/commands`. Základ:
 * `/bless [@user]` – krátké osobní požehnání pro uživatele
 * `/biblicquiz` – biblický trivia s 10+ otázkami - **+1-2 XP**
 
+### Minihry
+
+* `/versfight @user` – veršový duel s hlasováním komunity - **+50 XP** vítězi
+* `/rollblessing` – RNG požehnání s hodinovým cooldownem - **+5 XP**
+
 ### Server Analytics (v2.7.1)
 
 * `/serverstats` – přehled aktivit, hudby (ve frontě + přehrané) a top her na serveru
 * `/leaderboard` – Top 10 hráčů podle XP s hodinami hraní
+* `/profile [@user]` – osobní profil s XP, levelem, TOP 5 hrami a rankingem
 * `/weeklysummary` – automaticky se posílá každý týden do požehnání kanálu
 
 ### Ostatní
 
-* `/xp` – zobrazí tvou aktuální XP a úroveň
-* `/freegames` – aktuální přehled free her z 4+ spolehlivých zdrojů (Epic, Steam, PlayStation, GOG, IsThereAnyDeal, Reddit)
+* `/freegames` – aktuální přehled free her z Epic, Steam (Reddit) a PlayStation Plus
 * `/commands` – kompletní seznam příkazů
 * `/version` – info o verzi
 * `/diag` – diagnostika bota
@@ -450,15 +457,37 @@ Správa konfigurace per-guild:
 * ✅ **Message když Steam nemá hry zdarma** – Zobrazí "❌ Steam" když je Steam prázdný
 * 📍 *Upozornění na končící hry* – Základ implementován, volno pro rozšíření (API nevrací expiration data)
 
-### 🟩 v2.7 – Server Analytics & Summary (AKTIVNÍ)
+### 🟩 v2.7 – Server Analytics & Summary (HOTOVO)
 
 * `/serverstats` – přehled aktivit, hudby, miniher
 * Leaderboard hráčů
-* `/myactivity` – osobní statistiky
+* `/profile` – osobní statistiky
 * Týdenní shrnutí aktivit
 * Agregace hraných her + hudební historie
 
-### 🟩 v2.8 – Spotify Integration Pack (HOTOVO)
+### 🟨 v2.8 – Spotify Integration Pack (ODLOŽENO)
+
+Implementováno (OAuth, Spotify Connect playback, `/sp`, `/spauth`, `/spqueue`, ...), ale
+před vydáním **odloženo na pozdější verzi** (viz v2.9 níže), aby prioritu dostala oprava
+YouTube přehrávání v v2.8.1. Kód zůstává v historii gitu.
+
+### 🟩 v2.8.1-beta – Music Fix Pack (AKTIVNÍ – 2026-08-26)
+
+Oprava YouTube přehrávání a dalších nalezených chyb po celkovém code review:
+
+* ✅ **YouTube extrakce opravena** – `yt-dlp` teď používá `extractor_args` (player klienti bez nutnosti PO tokenu), volitelné `YTDLP_COOKIES_FILE`/`YTDLP_PLAYER_CLIENTS` v `.env`
+* ✅ **Bot se už nezasekává při načítání skladby** – `yt-dlp` extrakce běží přes `asyncio.to_thread`, neblokuje event loop (dřív mrzl celý bot na všech serverech při každém `/yt`)
+* ✅ **Guard proti tichému selhání** – detekce, když yt-dlp vrátí neplatný non-audio stream (stará/nekompatibilní verze)
+* ✅ **Opraven odhad délky fronty** – `duration` se teď skutečně načítá z yt-dlp (dřív vždy fallback 180s)
+* ✅ **`/voicetest` opraven** – neplatný `stdin=` parametr způsoboval pád při každém spuštění; navíc přehrával ticho místo tónu
+* ✅ **`/diag` – živý yt-dlp self-test** – verze + reálná zkušební extrakce přímo v diagnostice
+* ✅ **Opravené odkazy na příkazy** v `/commands`, `/version` a docs (`/myactivity` a `/xp` už neexistují, správně je `/profile`)
+* ⏸️ **Spotify integrace dočasně odebrána z kódu** – odloženo na v2.9, viz výše
+* 📄 Detaily viz [docs/CHANGELOG.md](docs/CHANGELOG.md)
+
+### 🟨 v2.9 – Spotify Integration + Web Dashboard (PLÁNOVANÉ)
+
+**Spotify:**
 
 * **Spotify Web API support** – `/sp <spotify_url>` přidá skladbu nebo playlist do fronty
 * **Spotify Connect playback** – Bot ovládá tvou Spotify aplikaci přes Spotify Connect (legitimní streaming)
@@ -468,7 +497,7 @@ Správa konfigurace per-guild:
 * **Queue duration estimation** – Odhad času i pro Spotify skladby
 * **Error handling** – Bez vlivu na YouTube přehrávání (`/yt`), oddělené systémy
 
-### 🟨 v2.9 – Web Dashboard (PLÁNOVANÉ)
+**Web Dashboard:**
 
 * Běží přímo na Raspberry Pi (Flask/FastAPI)
 * Živé zobrazení právě hrané hudby

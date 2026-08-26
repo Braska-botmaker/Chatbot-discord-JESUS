@@ -30,9 +30,9 @@ python bot.py
 
 ### 4. Test
 ```
-!vtest      # Test voice - měl by zahrát 3s tón
-!play <URL> # Přehrávání YouTube
-!diag       # Kontrola všech komponent
+/voicetest      # Test voice - měl by zahrát 3s tón
+/yt <URL> # Přehrávání YouTube
+/diag       # Kontrola všech komponent
 ```
 
 ## 📚 Dokumentace
@@ -100,7 +100,7 @@ journalctl -u discordbot -f
 ## 🎉 Bot je teď production-ready!
 
 Měl by běžet **stabilně 24/7** bez problémů. Pokud se něco stane, checkni:
-1. `!diag` – Diagnostika v Discord
+1. `/diag` – Diagnostika v Discord
 2. `python validate_setup.py` – Validace setupu
 3. **FAQ.md** – Otázky & odpovědi
 4. **README.md** – Kompletní dokumentace
