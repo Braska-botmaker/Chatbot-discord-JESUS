@@ -372,6 +372,39 @@ if YTDLP_COOKIES_FILE:
     else:
         print(f"[yt-dlp] ⚠️ YTDLP_COOKIES_FILE je nastaveno, ale soubor neexistuje: {YTDLP_COOKIES_FILE}")
 
+# v2.8.3: yt-dlp od (zhruba) 2026.08 potřebuje pro spolehlivou extrakci z YouTube
+# JavaScript runtime (řeší tzv. "JS challenge" – bez něj hrozí nespolehlivá extrakce,
+# nebo přímo "Sign in to confirm you're not a bot"). yt-dlp umí sám najít "deno"/"node"/
+# "quickjs"/"bun" v PATH, ale PATH systemd služby často neobsahuje uživatelsky
+# nainstalované binárky (např. Deno do ~/.deno/bin) – proto tu cestu najdeme sami
+# a předáme ji yt-dlp explicitně, ať je to spolehlivé i mimo interaktivní shell.
+# Priorita podle doporučení yt-dlp: deno > node > quickjs > bun.
+def _find_js_runtime():
+    home = pathlib.Path.home()
+    candidates = [
+        ("deno", shutil.which("deno") or str(home / ".deno" / "bin" / "deno")),
+        ("node", shutil.which("node") or "/usr/bin/node"),
+        ("quickjs", shutil.which("quickjs") or shutil.which("qjs")),
+        ("bun", shutil.which("bun")),
+    ]
+    for name, path in candidates:
+        if path and pathlib.Path(path).is_file():
+            return name, path
+    return None, None
+
+_js_runtime_name, _js_runtime_path = _find_js_runtime()
+if _js_runtime_name:
+    # Python API očekává dict {runtime: {"path": ...}}, ne "runtime:cesta" string z CLI
+    # (viz yt_dlp/__init__.py – parse_options() sestavuje js_runtimes takhle z argparse).
+    YDL_OPTS["js_runtimes"] = {_js_runtime_name: {"path": _js_runtime_path}}
+    print(f"[yt-dlp] JS runtime: {_js_runtime_name} ({_js_runtime_path})")
+else:
+    print(
+        "[yt-dlp] ⚠️ Žádný JS runtime (deno/node/quickjs/bun) nenalezen – YouTube "
+        "extrakce může být nespolehlivá. Nainstaluj Node.js (`sudo apt-get install nodejs`) "
+        "nebo Deno (https://deno.land)."
+    )
+
 FFMPEG_RECONNECT = "-reconnect 1 -reconnect_streamed 1 -reconnect_delay_max 5 -rw_timeout 5000000 -nostdin"
 FFMPEG_OPTIONS = "-vn -ac 1 -b:a 128k -bufsize 256k"
 FFMPEG_OPTIONS_RPi = "-vn -ac 1 -b:a 96k -bufsize 128k"
