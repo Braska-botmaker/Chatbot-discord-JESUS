@@ -178,6 +178,8 @@ Detaily v [CHANGELOG.md](docs/CHANGELOG.md).
 
 - 🎧 **Spotify Integration** – `/sp`, `/spauth`, Spotify Connect playback (hotovo v kódu, čeká na vydání)
 - 🖥️ **Web Dashboard** – živé zobrazení hrané hudby, vizuální konfigurace, log viewer (Flask/FastAPI na Raspberry Pi)
+- 🎉 **Svátek dne** – denní automatická zpráva se jmeninami (statická tabulka, žádné externí API)
+- 🎮 **`/squadup <hra>`** – sežene spoluhráče na konkrétní hru; autocomplete z už sbírané `game_activity`, upozorní lidi, co danou hru mají v historii
 - 🌍 **v3.0** – vícejazyčný režim (CZ/EN/SK), modulární pluginy, companion web app
 
 Historie všech předchozích verzí (v1.0 → v2.8.2) je v [docs/CHANGELOG.md](docs/CHANGELOG.md).
