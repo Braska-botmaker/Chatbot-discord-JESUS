@@ -1,7 +1,13 @@
-# ╔════════════════════════════════════════════════════════════════════════════╗
-# ║  Ježíš Discord Bot v2.8.2 – Voice & Player Client Hotfix                   ║
-# ║                     Kompletní přepis na slash commands                     ║
-# ╚════════════════════════════════════════════════════════════════════════════╝
+"""Ježíš Discord Bot – hudba, biblické verše, požehnání a server analytika.
+
+Verze:       BOT_VERSION níže
+Repo:        https://github.com/Braska-botmaker/Chatbot-discord-JESUS
+Dokumentace: docs/INSTALL.md, docs/TROUBLESHOOTING.md
+Licence:     Custom Non-Commercial – viz LICENSE
+Autor:       Matěj Horák (Braska-botmaker)
+
+Spuštění:    python bot.py   (Python 3.10+, .env s DISCORD_TOKEN – viz docs/INSTALL.md)
+"""
 
 # ═══════════════════════════════════════════════════════════════════════════════
 #                              1. IMPORTS & SETUP
@@ -29,6 +35,14 @@ from html import unescape as html_unescape
 import xml.etree.ElementTree as ET
 
 _yt_dlp = None
+
+# ── Verze bota – JEDINÝ zdroj pravdy ──────────────────────────────────────────
+# Při vydání uprav tyhle 3 řádky + přidej sekci do docs/CHANGELOG.md + `git tag vX.Y.Z`
+# (README badge se čte z tagu). Nikde jinde verzi nepiš natvrdo – používá se
+# ve startup logu, /version a /diag.
+BOT_VERSION = "2.8.3"
+BOT_CODENAME = "yt-dlp JS Runtime Fix"
+BOT_RELEASE_DATE = "2026-09-07"
 
 # ═══════════════════════════════════════════════════════════════════════════════
 #                    2. RPi VOICE FIX (Error 4006 Handling)
@@ -379,7 +393,28 @@ if YTDLP_COOKIES_FILE:
 # nainstalované binárky (např. Deno do ~/.deno/bin) – proto tu cestu najdeme sami
 # a předáme ji yt-dlp explicitně, ať je to spolehlivé i mimo interaktivní shell.
 # Priorita podle doporučení yt-dlp: deno > node > quickjs > bun.
+#
+# Autodetekce jde přebít přes .env klíč YTDLP_JS_RUNTIME (stejný princip jako
+# YTDLP_PLAYER_CLIENTS) – buď "name:cesta" (např. "node:/usr/local/bin/node"),
+# nebo jen cesta ("/usr/bin/node" – jméno se odvodí z názvu souboru), nebo jen
+# jméno ("deno" – dohledá se v PATH).
+YTDLP_JS_RUNTIME = os.getenv("YTDLP_JS_RUNTIME", "").strip()
+
 def _find_js_runtime():
+    if YTDLP_JS_RUNTIME:
+        if ":" in YTDLP_JS_RUNTIME and not YTDLP_JS_RUNTIME[1:2] == ":":  # "name:path" (ne "C:\...")
+            name, _, path = YTDLP_JS_RUNTIME.partition(":")
+            name, path = name.strip(), path.strip()
+        elif "/" in YTDLP_JS_RUNTIME or "\\" in YTDLP_JS_RUNTIME:  # holá cesta
+            path = YTDLP_JS_RUNTIME
+            name = pathlib.Path(path).stem or "node"
+        else:  # holé jméno runtime
+            name = YTDLP_JS_RUNTIME
+            path = shutil.which(name)
+        if path and pathlib.Path(path).is_file():
+            return name, path
+        print(f"[yt-dlp] ⚠️ YTDLP_JS_RUNTIME='{YTDLP_JS_RUNTIME}' nevede na existující soubor – zkouším autodetekci.")
+
     home = pathlib.Path.home()
     candidates = [
         ("deno", shutil.which("deno") or str(home / ".deno" / "bin" / "deno")),
@@ -1355,8 +1390,8 @@ game_blessings = {
 @bot.event
 async def on_ready():
     """Bot startup event – synchronizuj slash commands a spusť scheduled tasks."""
-    print(f"✅ Bot je přihlášen jako {bot.user}")
-    
+    print(f"✅ Bot je přihlášen jako {bot.user}  (v{BOT_VERSION} – {BOT_CODENAME})")
+
     # 🔧 Inicializuj prázdný JSON pokud neexistuje (bezpečnost)
     db = _load_data()
     if not db:
@@ -2581,20 +2616,20 @@ async def version_command(interaction: discord.Interaction):
     """Show bot version and changelog."""
     try:
         embed = discord.Embed(
-            title="ℹ️ Ježíš Discord Bot – v2.8.2",
-            description="Voice & Player Client Hotfix",
+            title=f"ℹ️ Ježíš Discord Bot – v{BOT_VERSION}",
+            description=BOT_CODENAME,
             color=discord.Color.gold()
         )
 
         embed.add_field(
             name="⏱️ Version",
-            value="v2.8.2\nVoice & Player Client Hotfix",
+            value=f"v{BOT_VERSION}\n{BOT_CODENAME}",
             inline=True
         )
 
         embed.add_field(
             name="📅 Release",
-            value="2026-08-26",
+            value=BOT_RELEASE_DATE,
             inline=True
         )
         
@@ -2616,7 +2651,7 @@ async def version_command(interaction: discord.Interaction):
         )
         
         embed.add_field(
-            name="📊 v2.7 Analytics (NEW)",
+            name="📊 Analytics",
             value="""🏆 `/leaderboard` – Top 10 hráči
 📊 `/serverstats` – Server aktivita
 📈 `/profile` – Tvůj profil
@@ -2633,11 +2668,12 @@ async def version_command(interaction: discord.Interaction):
         )
 
         embed.add_field(
-            name="🔧 v2.8.2 Bugfixy (NEW)",
-            value="""🔊 Voice spojení opraveno (DAVE/discord.py 2.7.1)
-🎥 yt-dlp player klienti – zpět na auto-výběr
-⚡ Přehrávání už neblokuje celého bota
-🩺 `/diag` – živý yt-dlp self-test""",
+            name=f"🔧 Poslední změny (v{BOT_VERSION})",
+            value="""🟢 yt-dlp JS runtime (node/deno) auto-detekce
+🔊 Voice přes DAVE (discord.py ≥ 2.7.1)
+⚡ Přehrávání neblokuje event loop
+🩺 `/diag` – živý yt-dlp self-test
+📜 Detaily: viz CHANGELOG níže""",
             inline=True
         )
 
@@ -2807,7 +2843,7 @@ async def diag_command(interaction: discord.Interaction):
     voice_count = len(bot.voice_clients)
     embed.add_field(name="🎤 Voice", value=f"Connected: {voice_count}", inline=True)
     if bot.user:
-        embed.add_field(name="⏱️ Version", value="v2.8.2\nVoice & Player Client Hotfix", inline=True)
+        embed.add_field(name="⏱️ Version", value=f"v{BOT_VERSION}\n{BOT_CODENAME}", inline=True)
 
     # v2.8.1: Živý test yt-dlp/YouTube extrakce – nejrychlejší způsob, jak zjistit
     # jestli je problém v zastaralém yt-dlp, nebo jinde.
@@ -2820,7 +2856,13 @@ async def diag_command(interaction: discord.Interaction):
             yt_test = f"✅ OK ({test_info.get('title', '?')[:40]})"
     except Exception as e:
         yt_test = f"❌ {str(e)[:150]}"
-    embed.add_field(name="🎥 yt-dlp", value=f"Verze: {yt_dlp_version}\nTest: {yt_test}\nKlienti: {', '.join(YTDLP_PLAYER_CLIENTS)}", inline=False)
+    clients_str = ", ".join(YTDLP_PLAYER_CLIENTS) if YTDLP_PLAYER_CLIENTS else "auto (yt-dlp)"
+    js_str = f"{_js_runtime_name} ({_js_runtime_path})" if _js_runtime_name else "❌ chybí (node/deno)"
+    embed.add_field(
+        name="🎥 yt-dlp",
+        value=f"Verze: {yt_dlp_version}\nTest: {yt_test}\nKlienti: {clients_str}\nJS runtime: {js_str}",
+        inline=False,
+    )
 
     await interaction.followup.send(embed=embed)
 

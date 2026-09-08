@@ -151,8 +151,11 @@ Vše v časovém pásmu **Europe/Prague**:
 
 Nejde hudba, voice, nebo se bot nespustí? → **[docs/TROUBLESHOOTING.md](docs/TROUBLESHOOTING.md)**
 
-Rychlá první pomoc: spusť `/diag` v Discordu – ukáže stav FFmpeg/Opus/voice a živě otestuje,
-jestli aktuálně funguje YouTube extrakce.
+Rychlá první pomoc: spusť `/diag` v Discordu – ukáže stav FFmpeg/Opus/voice, JS runtime
+a živě otestuje, jestli aktuálně funguje YouTube extrakce.
+
+Hlubší diagnostika mimo bota (síť, UDP buffery, teplota, verze knihoven):
+`python tools/rpi_voice_diagnostics.py` na daném stroji.
 
 ---
 

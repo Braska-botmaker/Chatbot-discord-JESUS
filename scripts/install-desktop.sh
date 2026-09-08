@@ -3,7 +3,7 @@
 # Spuštění: bash install-desktop.sh
 #
 # Tento skript nainstaluje všechno co je potřeba:
-#   ✅ Python virtuální prostředí
+#   ✅ Python virtuální prostředí (.venv)
 #   ✅ Python závislosti
 #   ✅ Bot nastavení
 
@@ -39,30 +39,42 @@ if command -v ffmpeg &> /dev/null; then
     FFMPEG_VER=$(ffmpeg -version 2>/dev/null | head -1 | awk '{print $3}')
     info "FFmpeg: $FFMPEG_VER"
 else
-    warn "FFmpeg není nainstalován (volitelný)"
+    warn "FFmpeg není nainstalován (volitelný, ale bez něj nehraje hudba)"
     warn "Na Linuxu: sudo apt install ffmpeg"
     warn "Na macOS: brew install ffmpeg"
 fi
 
-# 3. Vytvoř venv
+# 3. Zkontroluj JS runtime pro yt-dlp (v2.8.3, volitelné ale doporučené)
 echo ""
-echo "3️⃣  Vytváření virtuálního prostředí..."
-if [ -d "venv" ]; then
-    info "venv již existuje"
+echo "3️⃣  Zkontroluj JS runtime (node/deno) pro yt-dlp..."
+if command -v node &> /dev/null; then
+    info "Node.js: $(node --version)"
+elif command -v deno &> /dev/null; then
+    info "Deno: $(deno --version 2>/dev/null | head -1)"
 else
-    python3 -m venv venv || error "venv vytvoření selhalo"
-    info "venv vytvořen"
+    warn "Node ani Deno nenalezeny – YouTube extrakce může selhat na 'Sign in to confirm you're not a bot'."
+    warn "Na Linuxu: sudo apt install nodejs   |   Na macOS: brew install node"
 fi
 
-# 4. Aktivuj venv
+# 4. Vytvoř venv
 echo ""
-echo "4️⃣  Aktivace venv..."
-source venv/bin/activate || error "venv aktivace selhala"
-info "venv aktivován"
+echo "4️⃣  Vytváření virtuálního prostředí (.venv)..."
+if [ -d ".venv" ]; then
+    info ".venv již existuje"
+else
+    python3 -m venv .venv || error "venv vytvoření selhalo"
+    info ".venv vytvořen"
+fi
 
-# 5. Instaluj balíčky
+# 5. Aktivuj venv
 echo ""
-echo "5️⃣  Instalace Python balíčků..."
+echo "5️⃣  Aktivace .venv..."
+source .venv/bin/activate || error "venv aktivace selhala"
+info ".venv aktivován"
+
+# 6. Instaluj balíčky
+echo ""
+echo "6️⃣  Instalace Python balíčků..."
 warn "Toto může trvat 1-3 minuty..."
 pip install --upgrade pip > /dev/null 2>&1
 if [ -f "config/requirements.txt" ]; then
@@ -72,9 +84,9 @@ else
     error "config/requirements.txt nenalezen!"
 fi
 
-# 6. Vytvoř .env
+# 7. Vytvoř .env
 echo ""
-echo "6️⃣  Konfigurace .env..."
+echo "7️⃣  Konfigurace .env..."
 if [ -f ".env" ]; then
     warn ".env již existuje"
 else
@@ -86,7 +98,7 @@ else
     fi
 fi
 
-# 7. Zkontroluj .env
+# 8. Zkontroluj .env
 if grep -q "your_bot_token_here" .env; then
     error ""
     error "❌ POZOR: Musíš vyplnit DISCORD_TOKEN v .env!"
@@ -102,21 +114,29 @@ if grep -q "your_bot_token_here" .env; then
 fi
 info ".env je vyplněn"
 
-# 8. Testuj bota
+# 9. Testuj bota
 echo ""
-echo "7️⃣  Test bota..."
-warn "Spouštím bota na 10 sekund..."
-timeout 10 python3 bot.py > /tmp/bot_test.log 2>&1 || true
-
-if grep -q "Bot je přihlášen jako" /tmp/bot_test.log; then
-    info "Bot se úspěšně přihlásil! ✅"
+echo "9️⃣  Test bota..."
+if command -v timeout &> /dev/null; then
+    TIMEOUT_BIN=timeout
+elif command -v gtimeout &> /dev/null; then
+    TIMEOUT_BIN=gtimeout    # macOS s coreutils (brew install coreutils)
 else
-    warn "Kontrola logu..."
-    if grep -q "ModuleNotFoundError\|ImportError" /tmp/bot_test.log; then
+    TIMEOUT_BIN=""
+fi
+
+if [ -n "$TIMEOUT_BIN" ]; then
+    warn "Spouštím bota na 10 sekund..."
+    "$TIMEOUT_BIN" 10 python3 bot.py > /tmp/bot_test.log 2>&1 || true
+    if grep -q "Bot je přihlášen jako" /tmp/bot_test.log; then
+        info "Bot se úspěšně přihlásil! ✅"
+    elif grep -q "ModuleNotFoundError\|ImportError" /tmp/bot_test.log; then
         error "Chybí Python modul! Zkontroluj: cat /tmp/bot_test.log"
     else
         warn "Test timeout (je OK, bot se připravuje)"
     fi
+else
+    warn "'timeout' není k dispozici – přeskakuji auto-test. Ověř ručně: python3 bot.py"
 fi
 
 # HOTOVO!
@@ -127,7 +147,7 @@ echo "=========================================="
 echo ""
 echo "🚀 Spuštění bota:"
 echo ""
-echo "  source venv/bin/activate"
+echo "  source .venv/bin/activate"
 echo "  python3 bot.py"
 echo ""
 echo "📝 Testuj v Discordu:"

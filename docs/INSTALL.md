@@ -16,6 +16,7 @@ Obojí sdílí stejné [požadavky](#-požadavky) a [konfiguraci](#-konfigurace-
 | Python | 3.10+ | |
 | FFmpeg | jakákoli aktuální | přehrávání do voice kanálu |
 | Opus knihovna | – | `libopus0` na Debian/Ubuntu/Raspberry Pi OS |
+| Node.js *(nebo Deno)* | LTS | yt-dlp ho od ~2026.08 potřebuje k YouTube extrakci (JS challenge). Bez něj přehrávání selže na *„Sign in to confirm you're not a bot"*. |
 | Discord účet | – | admin práva na serveru, kam bota přidáváš |
 
 Instalace systémových balíčků:
@@ -23,7 +24,7 @@ Instalace systémových balíčků:
 ```bash
 # Debian / Ubuntu / Raspberry Pi OS
 sudo apt update
-sudo apt install -y ffmpeg libopus0 python3-venv git
+sudo apt install -y ffmpeg libopus0 python3-venv git nodejs
 ```
 
 ```powershell
@@ -92,6 +93,7 @@ To je jediná **povinná** proměnná. Volitelné:
 |---|---|---|
 | `YTDLP_PLAYER_CLIENTS` | *(prázdné)* | Vynutí konkrétní yt-dlp "player kliency" pro YouTube extrakci. Nech prázdné – yt-dlp si aktuálně poradí sám. Použij jen jako nouzovou zálohu, viz [Troubleshooting](TROUBLESHOOTING.md#-youtube-nehraje--žádný-zvuk). |
 | `YTDLP_COOKIES_FILE` | *(prázdné)* | Cesta k `cookies.txt` (Netscape formát) pro věkově omezená videa. |
+| `YTDLP_JS_RUNTIME` | *(prázdné)* | Cesta / jméno JS runtime pro yt-dlp (`node`, `deno`, …). Nech prázdné – bot si ho najde v PATH. Vyplň jen když je binárka mimo PATH (`node:/opt/node/bin/node` nebo holá cesta). |
 
 Šablona se všemi proměnnými a komentáři: [`config/.env.example`](../config/.env.example) (root `.env.example` je identický).
 
@@ -154,9 +156,10 @@ Wants=network-online.target
 
 [Service]
 Type=simple
-User=%i
+User=pi
 WorkingDirectory=/opt/discordbot
 Environment="PYTHONUNBUFFERED=1"
+Environment="PATH=/opt/discordbot/.venv/bin:/usr/local/bin:/usr/bin:/bin"
 ExecStart=/opt/discordbot/.venv/bin/python3 /opt/discordbot/bot.py
 Restart=on-failure
 RestartSec=10
@@ -168,7 +171,14 @@ SyslogIdentifier=discordbot
 WantedBy=multi-user.target
 ```
 
-> Nahraď `User=%i` skutečným uživatelem (např. `pi`), pod kterým má bot běžet.
+> Nahraď `User=pi` skutečným uživatelem, pod kterým má bot běžet.
+> Řádek `Environment="PATH=…"` je důležitý – bez něj systemd běží s minimálním PATH
+> a yt-dlp nenajde `node` (→ *„Sign in to confirm you're not a bot"*). `/usr/bin` v něm
+> musí zůstat.
+
+💡 **Rychlejší cesta:** `bash scripts/install.sh` udělá celé produkční nasazení včetně
+této služby, instalace `nodejs` a `.env`. Proměnné `BOTDIR` / `SERVICE_NAME` / `REPO_URL`
+jdou přepsat: `BOTDIR=/srv/bot bash scripts/install.sh`.
 
 ```bash
 sudo systemctl daemon-reload
@@ -193,12 +203,13 @@ journalctl -u discordbot -f
 | Aktualizace kódu | `cd /opt/discordbot && git pull && sudo systemctl restart discordbot` |
 | Aktualizace balíčků | `source .venv/bin/activate && pip install -U -r config/requirements.txt && sudo systemctl restart discordbot` |
 | Aktualizace **jen** yt-dlp (nejčastější fix) | `source .venv/bin/activate && pip install -U yt-dlp && sudo systemctl restart discordbot` |
+| Aktualizace Node.js (yt-dlp JS runtime) | `sudo apt-get update && sudo apt-get install -y --only-upgrade nodejs && sudo systemctl restart discordbot` |
 
 ---
 
 ## ✅ Kontrolní seznam
 
-- [ ] Python 3.10+, FFmpeg, `libopus0` nainstalované
+- [ ] Python 3.10+, FFmpeg, `libopus0`, `nodejs` nainstalované (`node --version` odpoví)
 - [ ] `pip install -r config/requirements.txt` proběhlo bez chyb
 - [ ] `.env` obsahuje platný `DISCORD_TOKEN`
 - [ ] Privileged Intents zapnuté v Developer Portalu (Presence, Server Members, Message Content)

@@ -1,6 +1,14 @@
 #!/usr/bin/env python3
 """
-Simulace přímo toho co dělá /freegames command
+Offline test JEN Steam/Reddit větve z bot.py `get_free_games()`.
+
+POZOR: tohle není plná simulace `/freegames` – Epic Games ani PlayStation Plus
+zdroje tady nejsou. Slouží k rychlému ověření, že Reddit r/FreeGameFindings
+API pořád vrací použitelná data a parsování `[Steam]` postů funguje.
+Logika je ručně zkopírovaná z bot.py – když se `get_free_games()` v botovi
+změní, aktualizuj i tenhle soubor.
+
+Spuštění:  python tools/test_freegames_steam.py
 """
 
 import sys
@@ -14,7 +22,7 @@ from html import unescape as html_unescape
 import xml.etree.ElementTree as ET
 
 def get_free_games():
-    """Kopie z bot.py - Sbírá zdarma hry z více zdrojů: Epic, Steam, PlayStation Plus."""
+    """Ručně zkopírovaná JEN Steam/Reddit větev z bot.py `get_free_games()`."""
     games = []
     seen = set()
     source_status = {

@@ -30,6 +30,13 @@ Pak zkontroluj přes `/diag` (má vestavěný živý test) nebo ručně:
 ### „Sign in to confirm you're not a bot" / HTTP 403 / video se "přehraje" 0 sekund
 
 - Ujisti se, že `yt-dlp` je aktuální (viz výše) – tohle samo řeší většinu případů.
+- **Chybí JavaScript runtime (v2.8.3).** YouTube od ~2026.08 vyžaduje k extrakci JS engine.
+  Zkontroluj `/diag` řádek **„JS runtime"** – pokud je `❌ chybí`, nainstaluj Node.js
+  (`sudo apt-get install -y nodejs`, dá `/usr/bin/node` i pro ARM) a restartuj službu.
+  V logu při startu pak musí být `[yt-dlp] JS runtime: node (/usr/bin/node)`. Když `node`
+  existuje, ale bot ho nevidí, běží nejspíš pod systemd s ořezaným `PATH` – přidej do
+  unit souboru `Environment="PATH=/opt/discordbot/.venv/bin:/usr/local/bin:/usr/bin:/bin"`,
+  nebo nastav `YTDLP_JS_RUNTIME=/usr/bin/node` v `.env`.
 - `YTDLP_PLAYER_CLIENTS` v `.env` nech **prázdné** – od v2.8.2 si `yt-dlp` vybírá klienta
   sám a je to spolehlivější, než cokoliv vynucovat. Vyplň ho jen dočasně jako pokus, pokud
   se problém opakuje i s aktuálním `yt-dlp` (viz [CHANGELOG](CHANGELOG.md) v2.8.1/v2.8.2,
@@ -146,6 +153,8 @@ journalctl -u discordbot -f | grep -iE "error|4006|4017|timeout|yt-dlp"
 | Hláška v logu | Co znamená |
 |---|---|
 | `Bot je přihlášen jako ...` | ✅ Bot je online |
+| `[yt-dlp] JS runtime: node (/usr/bin/node)` | ✅ JS runtime nalezen (v2.8.3) |
+| `[yt-dlp] ⚠️ Žádný JS runtime ... nenalezen` | ❌ Doinstaluj `nodejs`, jinak YouTube neteče |
 | `[RPi patch] Platform detection: ... is_arm=True` | ✅ ARM patch aktivní (Raspberry Pi) |
 | `[RPi patch] 4006 in connect(), retrying` | Automatický retry na chybu 4006 |
 | `[music] Extracting: ...` | Bot začal extrahovat skladbu přes yt-dlp |

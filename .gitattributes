@@ -1,0 +1,17 @@
+# Výchozí: git normalizuje konce řádků, ale nechá si detekci
+* text=auto
+
+# Skripty, které běží na Raspberry Pi / Linuxu MUSÍ mít LF –
+# jinak bash spadne na "/bin/bash^M: bad interpreter". core.autocrlf=true
+# by je jinak při každém checkoutu na Windows převedl na CRLF.
+*.sh        text eol=lf
+*.py        text eol=lf
+*.service   text eol=lf
+
+# Windows dávkové soubory naopak chtějí CRLF
+*.bat       text eol=crlf
+
+# Binárky – ať do nich git nešahá
+*.png       binary
+*.jpg       binary
+*.ico       binary

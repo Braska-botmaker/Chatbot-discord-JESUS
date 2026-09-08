@@ -7,3 +7,8 @@ env/
 __pycache__
 .pytest_cache/
 /.vscode/
+
+# Runtime data / tajnosti – nikdy necommitovat
+bot_data.json
+cookies.txt
+*.log

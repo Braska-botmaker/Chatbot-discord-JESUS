@@ -112,23 +112,58 @@ def check_socket():
     out_mtu, _ = run_cmd("ip link show 2>/dev/null | grep -i mtu || echo 'N/A'")
     print(f"Network MTU: {out_mtu if out_mtu else 'N/A'}")
 
+def _ver_tuple(v):
+    out = []
+    for part in str(v).split("."):
+        num = "".join(ch for ch in part if ch.isdigit())
+        out.append(int(num) if num else 0)
+    return tuple(out)
+
 def check_discord_py():
     """Check discord.py installation"""
     print("\n=== DISCORD.PY ===")
-    
+
     try:
         import discord
-        print(f"✅ discord.py: {discord.__version__}")
-        
+        ver = discord.__version__
+        # v2.8.2: Discord vyžaduje pro voice DAVE (E2EE) protokol – umí ho až 2.7.1+.
+        # Starší verze padá při voice handshake s nedokumentovaným kódem 4017.
+        if _ver_tuple(ver) >= (2, 7, 1):
+            print(f"✅ discord.py: {ver} (podporuje DAVE / kód 4017 OK)")
+        else:
+            print(f"❌ discord.py: {ver} – PŘÍLIŠ STARÉ pro DAVE, voice spadne s 4017!")
+            print(f"   → pip install -U \"discord.py[voice]\"")
+
         # Check voice requirements
         try:
             import discord.voice_client
             print(f"✅ Voice client module: OK")
-        except:
+        except Exception:
             print(f"❌ Voice client module: FAILED")
-            
+
+        # davey – povinná závislost pro DAVE (přijde s discord.py[voice] >= 2.7.1)
+        try:
+            import davey  # noqa: F401
+            print(f"✅ davey (DAVE): INSTALLED")
+        except Exception:
+            print(f"❌ davey (DAVE): NOT INSTALLED – pip install -U \"discord.py[voice]\"")
+
     except Exception as e:
         print(f"❌ discord.py: {e}")
+
+def check_js_runtime():
+    """Check JS runtime for yt-dlp (v2.8.3)"""
+    print("\n=== JS RUNTIME (yt-dlp) ===")
+    # YouTube od ~2026.08 vyžaduje k extrakci JS engine, jinak "Sign in to confirm you're not a bot".
+    found = False
+    for name in ("deno", "node", "quickjs", "qjs", "bun"):
+        path, code = run_cmd(f"command -v {name}")
+        if code == 0 and path:
+            print(f"✅ {name}: {path}")
+            found = True
+    if not found:
+        print("❌ Žádný JS runtime (deno/node/quickjs/bun) v PATH")
+        print("   → sudo apt-get install nodejs   (nebo nastav YTDLP_JS_RUNTIME v .env)")
 
 def check_memory():
     """Check available memory"""
@@ -198,6 +233,7 @@ def main():
     check_audio()
     check_socket()
     check_discord_py()
+    check_js_runtime()
     check_memory()
     check_cpu()
     
@@ -215,13 +251,16 @@ COMMON RPi VOICE ISSUES:
 1. CPU temp > 60°C → Reduce FFmpeg bitrate further
 2. Memory < 200MB → Kill background processes
 3. UDP socket size too small → Check buffer sizes
-4. PyNaCl/Opus missing → Install via: pip install PyNaCl
+4. PyNaCl/Opus missing → pip install -U "discord.py[voice]"
 5. Network MTU issues → Check with: ip link show
+6. discord.py < 2.7.1 → voice spadne s kódem 4017 (chybí DAVE)
+7. Chybí node/deno → yt-dlp: "Sign in to confirm you're not a bot"
 
 NEXT STEPS:
-- Run bot with these diagnostics running: python rpi_voice_diagnostics.py
-- During !play attempt, watch for network drops
+- Run bot with these diagnostics running: python tools/rpi_voice_diagnostics.py
+- During /yt attempt, watch for network drops
 - Check system logs: journalctl -u discordbot -f
+- V Discordu: /diag  (rychlejší, běží přímo v botovi)
 """)
 
 if __name__ == "__main__":

@@ -28,9 +28,9 @@ souhrnně v jednom embedu se seznamem odkazů.
 | 🎮 **Steam** (přes Reddit) | `r/FreeGameFindings` JSON, bez nutné autentizace | Limitované giveaways, filtruje se na `[Steam]` tag, max. 5 na běh |
 | 🎯 **PlayStation Plus** | RSS feed (`blog.playstation.com`) | Měsíční přehled novinek PS+ |
 
-Steam a přímé GOG/Prime Gaming API zdroje byly v minulosti zkoušeny a odstraněny (nespolehlivé
-nebo bez veřejného API) – aktuálně platí jen tyto 3 zdroje. Historie je v
-[CHANGELOG.md](CHANGELOG.md).
+Přímé API zdroje GOG, Amazon Prime Gaming, IsThereAnyDeal a Ubisoft+ byly v minulosti
+zkoušeny a odstraněny (nespolehlivé nebo bez veřejného API) – Steam proto jede oklikou přes
+Reddit. Aktuálně platí jen tyto 3 zdroje. Historie je v [CHANGELOG.md](CHANGELOG.md).
 
 Selhání jednoho zdroje neovlivní ostatní – každý má vlastní `try/except` a timeout.
 

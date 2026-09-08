@@ -2,8 +2,13 @@
 # Ježíš Discord Bot – Automatická instalace na Raspberry Pi
 # Spuštění: bash install.sh
 #
+# Volitelné proměnné prostředí (přepíšou výchozí hodnoty):
+#   BOTDIR=/opt/discordbot      – kam se bot nainstaluje
+#   REPO_URL=https://…/repo.git – odkud se klonuje (jinak se vezme z git origin)
+#   SERVICE_NAME=discordbot     – název systemd služby
+#
 # Tento skript nainstaluje všechno co je potřeba:
-#   ✅ Systémové balíčky (Python, FFmpeg, Opus)
+#   ✅ Systémové balíčky (Python, FFmpeg, Opus, Node.js pro yt-dlp)
 #   ✅ Virtual environment
 #   ✅ Python závislosti
 #   ✅ Discord bot (git clone)
@@ -37,18 +42,58 @@ error() {
     exit 1
 }
 
+# ── Konfigurace (jde přepsat přes proměnné prostředí) ────────────────────────
+BOTDIR="${BOTDIR:-/opt/discordbot}"
+SERVICE_NAME="${SERVICE_NAME:-discordbot}"
+SERVICE_FILE="/etc/systemd/system/${SERVICE_NAME}.service"
+
+# REPO_URL: když skript běží uvnitř už naklonovaného repa, vezmi origin; jinak default.
+if [ -z "${REPO_URL:-}" ]; then
+    REPO_URL="$(git -C "$(dirname "$0")/.." config --get remote.origin.url 2>/dev/null || true)"
+    REPO_URL="${REPO_URL:-https://github.com/Braska-botmaker/Chatbot-discord-JESUS.git}"
+fi
+
+# Funkce: zapiš systemd unit (jeden zdroj pravdy, ať se to neopakuje 2×)
+write_service() {
+    sudo tee "$SERVICE_FILE" > /dev/null <<EOF
+[Unit]
+Description=Ježíš Discord Bot (Raspberry Pi)
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=$USER
+WorkingDirectory=$BOTDIR
+Environment="PYTHONUNBUFFERED=1"
+Environment="PATH=$BOTDIR/.venv/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
+ExecStart=$BOTDIR/.venv/bin/python3 $BOTDIR/bot.py
+Restart=on-failure
+RestartSec=10
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=$SERVICE_NAME
+
+[Install]
+WantedBy=multi-user.target
+EOF
+}
+
 # 1. Zkontroluj, jestli jsi na RPi
 echo "1️⃣  Zkontroluj systém..."
 MACHINE=$(uname -m)
-if [[ ! "$MACHINE" == "aarch64" && ! "$MACHINE" == "armv7l" ]]; then
-    warn "Skript je optimalizován pro Raspberry Pi (ARM), ale detekuji: $MACHINE"
-    warn "Pokud to není RPi, některé věci nemusí fungovat!"
-    read -p "Pokračovat? (y/n) " -n 1 -r
-    echo
-    if [[ ! $REPLY =~ ^[Yy]$ ]]; then
-        error "Instalace zrušena"
-    fi
-fi
+case "$MACHINE" in
+    aarch64|armv8*|armv7l|armv6l) : ;;  # ARM varianty – OK
+    *)
+        warn "Skript je optimalizován pro Raspberry Pi (ARM), ale detekuji: $MACHINE"
+        warn "Pokud to není RPi, některé věci nemusí fungovat!"
+        read -p "Pokračovat? (y/n) " -n 1 -r
+        echo
+        if [[ ! $REPLY =~ ^[Yy]$ ]]; then
+            error "Instalace zrušena"
+        fi
+        ;;
+esac
 info "Systém: $MACHINE"
 
 # 2. Zkontroluj, jestli jsi root pro sudo
@@ -70,7 +115,9 @@ info "Systém aktualizován"
 # 4. Instaluj potřebné balíčky
 echo ""
 echo "4️⃣  Instalace systémových balíčků..."
-PACKAGES="python3-pip python3-venv ffmpeg libopus0 git"
+# nodejs (v2.8.3): yt-dlp od cca YouTube 2026.08 potřebuje JS runtime, jinak extrakce
+# končí "Sign in to confirm you're not a bot". apt balíček dá /usr/bin/node i pro ARM.
+PACKAGES="python3-pip python3-venv ffmpeg libopus0 git nodejs"
 for pkg in $PACKAGES; do
     if dpkg -l | grep -q "^ii  $pkg"; then
         info "$pkg již nainstalován"
@@ -86,13 +133,14 @@ echo ""
 echo "5️⃣  Ověřování verzí..."
 PYTHON_VER=$(python3 --version | awk '{print $2}')
 FFMPEG_VER=$(ffmpeg -version 2>/dev/null | head -1 | awk '{print $3}')
+NODE_VER=$(node --version 2>/dev/null || echo "N/A")
 info "Python: $PYTHON_VER"
 info "FFmpeg: $FFMPEG_VER"
+info "Node.js: $NODE_VER  (pro yt-dlp JS challenge)"
 
 # 6. Vytvoř složku pro bota
 echo ""
 echo "6️⃣  Příprava adresáře..."
-BOTDIR="/opt/discordbot"
 if [ -d "$BOTDIR" ]; then
     warn "Složka $BOTDIR již existuje"
     read -p "Přepsat? (y/n) " -n 1 -r
@@ -113,22 +161,19 @@ fi
 
 # 7. Klonuj nebo stáhni repo
 echo ""
-echo "7️⃣  Stažení bota..."
+echo "7️⃣  Stažení bota ($REPO_URL)..."
 cd "$BOTDIR"
 
-# Zkus git clone (pokud má přístup)
 if [ -d ".git" ]; then
     warn "Git repo již existuje, update..."
     git pull origin main > /dev/null 2>&1 || warn "Git pull selhalo, pokračuji"
 else
     warn "Klonuji repo z GitHubu..."
-    # Zkus klonovat, pokud URL není dostupná, řekni uživateli co dělat
-    if git clone https://github.com/Braska-botmaker/Chatbot-discord-JESUS.git . 2>/dev/null; then
+    if git clone "$REPO_URL" . 2>/dev/null; then
         info "Repo naklonován"
     else
         warn "Git clone selhalo (offline?)"
         warn "Ručně vytvářím strukturu..."
-        # Vytvoř základní strukturu
         mkdir -p docs config
         touch bot.py README.md .env .gitignore
         warn "Prosím zkopíruj bot.py a ostatní soubory ručně!"
@@ -213,9 +258,7 @@ fi
 
 # 12. Systemd service
 echo ""
-echo "1️⃣2️⃣  Nastavení systemd služby..."
-SERVICE_FILE="/etc/systemd/system/discordbot.service"
-
+echo "1️⃣2️⃣  Nastavení systemd služby ($SERVICE_NAME)..."
 if [ -f "$SERVICE_FILE" ]; then
     warn "Systemd služba již existuje"
     read -p "Přepsat? (y/n) " -n 1 -r
@@ -223,53 +266,11 @@ if [ -f "$SERVICE_FILE" ]; then
     if [[ ! $REPLY =~ ^[Yy]$ ]]; then
         info "Služba nebyla změněna"
     else
-        sudo tee "$SERVICE_FILE" > /dev/null <<EOF
-[Unit]
-Description=Ježíš Discord Bot (Raspberry Pi)
-After=network-online.target
-Wants=network-online.target
-
-[Service]
-Type=simple
-User=$USER
-WorkingDirectory=$BOTDIR
-Environment="PYTHONUNBUFFERED=1"
-Environment="PATH=$BOTDIR/.venv/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
-ExecStart=$BOTDIR/.venv/bin/python3 $BOTDIR/bot.py
-Restart=on-failure
-RestartSec=10
-StandardOutput=journal
-StandardError=journal
-SyslogIdentifier=discordbot
-
-[Install]
-WantedBy=multi-user.target
-EOF
+        write_service
         info "Systemd služba aktualizována"
     fi
 else
-    sudo tee "$SERVICE_FILE" > /dev/null <<EOF
-[Unit]
-Description=Ježíš Discord Bot (Raspberry Pi)
-After=network-online.target
-Wants=network-online.target
-
-[Service]
-Type=simple
-User=$USER
-WorkingDirectory=$BOTDIR
-Environment="PYTHONUNBUFFERED=1"
-Environment="PATH=$BOTDIR/.venv/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
-ExecStart=$BOTDIR/.venv/bin/python3 $BOTDIR/bot.py
-Restart=on-failure
-RestartSec=10
-StandardOutput=journal
-StandardError=journal
-SyslogIdentifier=discordbot
-
-[Install]
-WantedBy=multi-user.target
-EOF
+    write_service
     info "Systemd služba vytvořena"
 fi
 
@@ -277,22 +278,22 @@ fi
 echo ""
 echo "1️⃣3️⃣  Aktivace služby..."
 sudo systemctl daemon-reload > /dev/null 2>&1 || warn "daemon-reload selhalo"
-sudo systemctl enable discordbot > /dev/null 2>&1 || warn "enable selhalo"
+sudo systemctl enable "$SERVICE_NAME" > /dev/null 2>&1 || warn "enable selhalo"
 info "Služba je povolena (autostart)"
 
 # 14. Spusť službu
 echo ""
 echo "1️⃣4️⃣  Spuštění bota..."
-sudo systemctl start discordbot > /dev/null 2>&1 || warn "start selhalo"
+sudo systemctl start "$SERVICE_NAME" > /dev/null 2>&1 || warn "start selhalo"
 sleep 2
 
 # Zkontroluj status
-if sudo systemctl is-active --quiet discordbot; then
+if sudo systemctl is-active --quiet "$SERVICE_NAME"; then
     info "Bot běží! ✅"
 else
     warn "Bot se nespustil. Zkontroluj:"
-    warn "  sudo systemctl status discordbot"
-    warn "  sudo journalctl -u discordbot -f"
+    warn "  sudo systemctl status $SERVICE_NAME"
+    warn "  sudo journalctl -u $SERVICE_NAME -f"
 fi
 
 # HOTOVO! 🎉
@@ -302,14 +303,14 @@ echo "🎉 INSTALACE DOKONČENA! 🎉"
 echo "=========================================="
 echo ""
 echo "📊 Příkazy:"
-echo "  Status:        sudo systemctl status discordbot"
-echo "  Logy:          sudo journalctl -u discordbot -f"
-echo "  Zastavit:      sudo systemctl stop discordbot"
-echo "  Restartovat:   sudo systemctl restart discordbot"
+echo "  Status:        sudo systemctl status $SERVICE_NAME"
+echo "  Logy:          sudo journalctl -u $SERVICE_NAME -f"
+echo "  Zastavit:      sudo systemctl stop $SERVICE_NAME"
+echo "  Restartovat:   sudo systemctl restart $SERVICE_NAME"
 echo ""
 echo "📝 Testuj v Discordu:"
 echo "  /commands      # Seznam příkazů"
-echo "  /diag          # Diagnostika"
+echo "  /diag          # Diagnostika (vč. yt-dlp + JS runtime)"
 echo "  /verse         # Náhodný verš"
 echo ""
 echo "📚 Dokumentace:"
