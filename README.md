@@ -1,6 +1,6 @@
 # ✝️ Ježíš Discord Bot
 
-![Version](https://img.shields.io/badge/version-v2.8.2-blue)
+![Version](https://img.shields.io/github/v/tag/Braska-botmaker/Chatbot-discord-JESUS?sort=semver&label=version&color=blue)
 ![Python](https://img.shields.io/badge/python-3.10%2B-blue)
 ![Platform](https://img.shields.io/badge/platform-Raspberry%20Pi%20%7C%20Linux%20%7C%20Windows-informational)
 ![License](https://img.shields.io/badge/license-Custom%20Non--Commercial-lightgrey)
@@ -171,8 +171,8 @@ jestli aktuálně funguje YouTube extrakce.
 
 ## 🛣️ Roadmapa
 
-**Aktuální verze: v2.8.2** – oprava YouTube přehrávání a voice spojení (DAVE protokol).
-Detaily v [CHANGELOG.md](docs/CHANGELOG.md).
+**Aktuální verze:** ![Version](https://img.shields.io/github/v/tag/Braska-botmaker/Chatbot-discord-JESUS?sort=semver&label=&color=blue)
+(nejnovější git tag – Detaily v [CHANGELOG.md](docs/CHANGELOG.md)).
 
 **Plánované:**
 
@@ -182,7 +182,7 @@ Detaily v [CHANGELOG.md](docs/CHANGELOG.md).
 - 🎮 **`/squadup <hra>`** – sežene spoluhráče na konkrétní hru; autocomplete z už sbírané `game_activity`, upozorní lidi, co danou hru mají v historii
 - 🌍 **v3.0** – vícejazyčný režim (CZ/EN/SK), modulární pluginy, companion web app
 
-Historie všech předchozích verzí (v1.0 → v2.8.2) je v [docs/CHANGELOG.md](docs/CHANGELOG.md).
+Historie všech předchozích verzí je v [docs/CHANGELOG.md](docs/CHANGELOG.md).
 
 ---
 

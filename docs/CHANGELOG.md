@@ -4,6 +4,36 @@ Všechny změny v tomto projektu jsou zaznamenány v tomto souboru.
 
 ---
 
+## [v2.8.3] – 2026-09-07 – yt-dlp JS Runtime Fix
+
+Pokračování hudební ságy z v2.8.1/v2.8.2. Po nasazení v2.8.2 na produkční Pi YouTube
+přitvrdilo znovu: od ~2026.08 vyžaduje `yt-dlp` pro spolehlivou extrakci vyřešení JS
+"challenge", což bez detekovaného JavaScript runtime (`deno`/`node`/`quickjs`/`bun`)
+končí chybou **"Sign in to confirm you're not a bot"**. Ověřeno živě na produkčním
+Raspberry Pi (armhf), ne jen teoreticky.
+
+### 🐛 Bugfix – chybějící JS runtime pro yt-dlp
+
+- `yt-dlp` si runtime umí najít sám v `PATH`, jenže `PATH` systemd služby neobsahuje
+  uživatelsky instalované binárky (např. Deno v `~/.deno/bin`). Navíc Deno nemá `armhf`
+  build, takže na 32bit userlandu Pi není použitelné vůbec.
+- **Fix:** nový helper `_find_js_runtime()` v `bot.py`, který runtime dohledá sám
+  (priorita dle doporučení yt-dlp: `deno` > `node` > `quickjs` > `bun`) a předá jeho
+  cestu explicitně do `YDL_OPTS["js_runtimes"]`. Když nic nenajde, vypíše varování
+  s návodem na instalaci.
+- Poznámka k API: `yt_dlp` Python API očekává `js_runtimes` jako dict
+  `{runtime: {"path": ...}}`, ne `"runtime:cesta"` string jako CLI `--js-runtimes` –
+  zdokumentováno v komentáři u kódu.
+
+### ⚙️ Nasazení
+
+- Na produkčním Pi (armhf) nutné doinstalovat Node.js: `sudo apt-get install nodejs`
+  (`/usr/bin/node`), pak nasadit `bot.py` a restartovat `discordbot.service`.
+  Ověřeno s Node.js 18.20.4.
+- Netestováno: reálné přehrání přes Discord hlasový kanál (ověřena jen extrakce,
+  ne download/stream přes ffmpeg) – doporučeno ověřit přes `/play`.
+---
+
 ## [v2.8.2] – 2026-08-26 – Voice & Player Client Hotfix
 
 Přímé pokračování v2.8.1-beta – po nasazení na produkční Pi se ukázalo, že v2.8.1 hudbu
@@ -625,5 +655,5 @@ Máte bug report nebo feature request? Napište na GitHub nebo zkontrolujte sekc
 
 ---
 
-**Poslední aktualizace:** 2026-08-26
+**Poslední aktualizace:** 2026-09-07
 **Maintainer:** Matěj Horák (Braska-botmaker)
